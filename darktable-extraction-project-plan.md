@@ -250,7 +250,7 @@ Note any rawspeed-specific CMake variables that need to be set.
 
 ### Task 2.1: Create IOP Stripping Script
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** None
 - **Output:** `scripts/strip_iop.py`
 
@@ -313,7 +313,7 @@ The script should be conservative—when uncertain, keep the code and add a TODO
 
 ### Task 2.2: Strip Template Module (exposure.c)
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** darktable `src/iop/exposure.c`
 - **Output:** `src/iop/exposure.c` (stripped)
 
@@ -343,17 +343,17 @@ Also create a minimal test that:
 
 ### Task 2.3: Batch Strip Essential Modules (Tier 1)
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Tier 1 module list
 - **Output:** Stripped source files
 
 **Tier 1 Modules:**
-- [ ] rawprepare.c
-- [ ] temperature.c (white balance)
-- [ ] highlights.c
-- [ ] demosaic.c
-- [ ] colorin.c
-- [ ] colorout.c
+- [x] rawprepare.c (945 -> 807 lines; removed 3 GUI functions)
+- [x] temperature.c (2250 -> 935 lines; removed 21 GUI functions)
+- [x] highlights.c (1375 -> 1093 lines; removed 6 GUI functions)
+- [x] demosaic.c (1876 -> 1504 lines; removed 10 GUI functions)
+- [x] colorin.c (2093 -> 1667 lines; removed 5 GUI functions + manual fix for update_profile_list)
+- [x] colorout.c (878 -> 754 lines; removed 6 GUI functions)
 
 **Claude Code Prompt:**
 ```
@@ -376,28 +376,30 @@ These are Tier 1 modules—the pipeline cannot function without them.
 
 ### Task 2.4: Batch Strip Core Creative Modules (Tier 2)
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Tier 2 module list
 - **Output:** Stripped source files
 
 **Tier 2 Modules (suggested—customize to your workflow):**
-- [ ] basecurve.c
-- [ ] filmic.c / filmicrgb.c
-- [ ] sigmoid.c
-- [ ] colorbalancergb.c
-- [ ] toneequalizer.c
-- [ ] sharpen.c
-- [ ] bilat.c (local contrast)
-- [ ] denoiseprofile.c
-- [ ] lens.c
-- [ ] crop.c
-- [ ] flip.c
-- [ ] clipping.c (perspective)
-- [ ] graduatednd.c
-- [ ] vignette.c
-- [ ] channelmixer.c / channelmixerrgb.c
-- [ ] levels.c
-- [ ] rgbcurve.c
+- [x] basecurve.c (2184 -> 1683 lines; removed 12 GUI functions)
+- [x] filmic.c (1648 -> 900 lines; removed 26 GUI functions)
+- [x] filmicrgb.c (4755 -> 3025 lines; removed 17 GUI functions)
+- [x] sigmoid.c (991 -> 867 lines; removed 3 GUI functions)
+- [x] colorbalancergb.c (2068 -> 1248 lines; removed 13 GUI functions)
+- [ ] toneequalizer.c (not present in source tree)
+- [x] sharpen.c (447 -> 420 lines; removed 1 GUI function)
+- [x] bilat.c (506 -> 361 lines; removed 3 GUI functions)
+- [x] denoiseprofile.c (3968 -> 3086 lines; removed 15 GUI functions)
+- [ ] lens.c (not present in source tree)
+- [x] crop.c (1939 -> 814 lines; removed 20 GUI functions)
+- [x] flip.c (631 -> 509 lines; removed 8 GUI functions)
+- [x] clipping.c (3349 -> 1355 lines; removed 25 GUI functions)
+- [x] graduatednd.c (1119 -> 734 lines; removed 11 GUI functions)
+- [x] vignette.c (1105 -> 634 lines; removed 7 GUI functions)
+- [x] channelmixer.c (761 -> 640 lines; removed 6 GUI functions)
+- [x] channelmixerrgb.c (4747 -> 2072 lines; removed 42 GUI functions)
+- [x] levels.c (999 -> 447 lines; removed 14 GUI functions)
+- [x] rgbcurve.c (1953 -> 693 lines; removed 21 GUI functions)
 
 **Claude Code Prompt:**
 ```

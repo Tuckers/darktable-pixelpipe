@@ -17,21 +17,20 @@
     You should have received a copy of the GNU General Public License
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "bauhaus/bauhaus.h"
+/* NOTE: This file has been extracted from darktable for the pixelpipe
+ * extraction project. GUI-related code has been removed using
+ * scripts/strip_iop.py. Only image processing logic, parameter structs,
+ * and pipeline functions are retained.
+ */
 #include "common/opencl.h"
 #include "common/imagebuf.h"
 #include "common/image_cache.h"
 #include "common/dng_opcode.h"
 #include "develop/imageop.h"
-#include "develop/imageop_gui.h"
 #include "develop/tiling.h"
-#include "gui/accelerators.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "imageio/imageio_rawspeed.h" // for dt_rawspeed_crop_dcraw_filters
 #include "iop/iop_api.h"
 
-#include <gtk/gtk.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -54,13 +53,6 @@ typedef struct dt_iop_rawprepare_params_t
   dt_iop_rawprepare_flat_field_t flat_field; // $DEFAULT: FLAT_FIELD_OFF $DESCRIPTION: "flat field correction"
 } dt_iop_rawprepare_params_t;
 
-typedef struct dt_iop_rawprepare_gui_data_t
-{
-  GtkWidget *black_level_separate[4];
-  GtkWidget *white_point;
-  GtkWidget *left, *top, *right, *bottom;
-  GtkWidget *flat_field;
-} dt_iop_rawprepare_gui_data_t;
 
 typedef struct dt_iop_rawprepare_data_t
 {
@@ -773,7 +765,6 @@ void reload_defaults(dt_iop_module_t *self)
   self->default_enabled = dt_image_is_rawprepare_supported(image) && !_image_is_normalized(image);
 
   if(self->widget)
-    gtk_stack_set_visible_child_name(GTK_STACK(self->widget), self->default_enabled ? "raw" : "non_raw");
 }
 
 void init_global(dt_iop_module_so_t *self)
@@ -801,77 +792,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_rawprepare_gui_data_t *g = self->gui_data;
-  dt_iop_rawprepare_params_t *p = self->params;
-
-  const gboolean is_monochrome =
-    (self->dev->image_storage.flags & (DT_IMAGE_MONOCHROME | DT_IMAGE_MONOCHROME_BAYER)) != 0;
-
-  if(is_monochrome)
-  {
-    // we might have to deal with old edits, so get average first
-    int av = 2; // for rounding
-    for(int i = 0; i < 4; i++)
-      av += p->raw_black_level_separate[i];
-
-    for(int i = 0; i < 4; i++)
-      dt_bauhaus_slider_set(g->black_level_separate[i], av / 4);
-  }
-
-  const gboolean is_sraw = (self->dev->image_storage.flags & DT_IMAGE_S_RAW) != 0;
-
-  // monochromes also have the sRaw flag set
-  if(is_sraw && !is_monochrome)
-  {
-    // we might have to deal with old edits, so copy
-    for(int i = 0; i < 4; i++)
-      if(p->raw_black_level_separate[i] == 0)
-        dt_bauhaus_slider_set(g->black_level_separate[i], p->raw_black_level_separate[0]);
-  }
-
-  // don't show upper three black levels for monochromes, nor last one for sRaws
-  for(int i = 1; i < 3; i++)
-    gtk_widget_set_visible(g->black_level_separate[i], !is_monochrome);
-
-  gtk_widget_set_visible(g->black_level_separate[3], !(is_monochrome || is_sraw));
-
-  gtk_widget_set_visible(g->flat_field, _check_gain_maps(self, NULL));
-  dt_bauhaus_combobox_set(g->flat_field, p->flat_field);
-}
-
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  dt_iop_rawprepare_gui_data_t *g = self->gui_data;
-  dt_iop_rawprepare_params_t *p = self->params;
-
-  const gboolean is_monochrome =
-    (self->dev->image_storage.flags & (DT_IMAGE_MONOCHROME | DT_IMAGE_MONOCHROME_BAYER)) != 0;
-
-  if(is_monochrome)
-  {
-    if(w == g->black_level_separate[0])
-    {
-      const int val = p->raw_black_level_separate[0];
-      for(int i = 1; i < 4; i++)
-        dt_bauhaus_slider_set(g->black_level_separate[i], val);
-    }
-  }
-
-  const gboolean is_sraw = (self->dev->image_storage.flags & DT_IMAGE_S_RAW) != 0;
-
-  // monochromes also have the sRaw flag set
-  if(is_sraw && !is_monochrome)
-  {
-    if(w == g->black_level_separate[0] || w == g->black_level_separate[1] || w == g->black_level_separate[2])
-    {
-      const float sum = (float)p->raw_black_level_separate[0] + (float)p->raw_black_level_separate[1]
-                        + (float)p->raw_black_level_separate[2];
-      dt_bauhaus_slider_set(g->black_level_separate[3], (uint16_t)roundf(sum / 3.0f));
-    }
-  }
-}
 
 const gchar *black_label[]
   =  { N_("black level 0"),
@@ -879,64 +799,6 @@ const gchar *black_label[]
        N_("black level 2"),
        N_("black level 3") };
 
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_rawprepare_gui_data_t *g = IOP_GUI_ALLOC(rawprepare);
-
-  GtkWidget *box_raw = self->widget = dt_gui_vbox();;
-
-  for(int i = 0; i < 4; i++)
-  {
-    gchar *par = g_strdup_printf("raw_black_level_separate[%i]", i);
-
-    g->black_level_separate[i] = dt_bauhaus_slider_from_params(self, par);
-    dt_bauhaus_widget_set_label(g->black_level_separate[i], NULL, black_label[i]);
-    gtk_widget_set_tooltip_text(g->black_level_separate[i], _(black_label[i]));
-    dt_bauhaus_slider_set_soft_max(g->black_level_separate[i], 16384);
-
-    g_free(par);
-  }
-
-  g->white_point = dt_bauhaus_slider_from_params(self, "raw_white_point");
-  gtk_widget_set_tooltip_text(g->white_point, _("white point"));
-  dt_bauhaus_slider_set_soft_max(g->white_point, 16384);
-
-  g->flat_field = dt_bauhaus_combobox_from_params(self, "flat_field");
-  gtk_widget_set_tooltip_text
-    (g->flat_field,
-     _("raw flat field correction to compensate for lens shading"));
-
-  if(dt_conf_get_bool("plugins/darkroom/rawprepare/allow_editing_crop"))
-  {
-    dt_gui_box_add(self->widget, dt_ui_section_label_new(C_("section", "crop")));
-
-    g->left = dt_bauhaus_slider_from_params(self, "left");
-    gtk_widget_set_tooltip_text(g->left, _("crop left border"));
-    dt_bauhaus_slider_set_soft_max(g->left, 256);
-
-    g->top = dt_bauhaus_slider_from_params(self, "top");
-    gtk_widget_set_tooltip_text(g->top, _("crop top border"));
-    dt_bauhaus_slider_set_soft_max(g->top, 256);
-
-    g->right = dt_bauhaus_slider_from_params(self, "right");
-    gtk_widget_set_tooltip_text(g->right, _("crop right border"));
-    dt_bauhaus_slider_set_soft_max(g->right, 256);
-
-    g->bottom = dt_bauhaus_slider_from_params(self, "bottom");
-    gtk_widget_set_tooltip_text(g->bottom, _("crop bottom border"));
-    dt_bauhaus_slider_set_soft_max(g->bottom, 256);
-  }
-
-  // start building top level widget
-  self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
-
-  GtkWidget *label_non_raw =
-    dt_ui_label_new(_("raw black/white point correction\nonly works for the sensors that need it."));
-
-  gtk_stack_add_named(GTK_STACK(self->widget), label_non_raw, "non_raw");
-  gtk_stack_add_named(GTK_STACK(self->widget), box_raw, "raw");
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

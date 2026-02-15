@@ -15,31 +15,30 @@
    You should have received a copy of the GNU General Public License
    along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
+/* NOTE: This file has been extracted from darktable for the pixelpipe
+ * extraction project. GUI-related code has been removed using
+ * scripts/strip_iop.py. Only image processing logic, parameter structs,
+ * and pipeline functions are retained.
+ */
 
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include "bauhaus/bauhaus.h"
 #include "common/box_filters.h"
 #include "common/bspline.h"
 #include "common/opencl.h"
 #include "common/imagebuf.h"
-#include "common/fast_guided_filter.h"
 #include "common/distance_transform.h"
 #include "common/interpolation.h"
 #include "control/control.h"
 #include "develop/develop.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "develop/noise_generator.h"
 #include "develop/tiling.h"
 #include "develop/masks.h"
-#include "gui/accelerators.h"
-#include "gui/gtk.h"
 
-#include <gtk/gtk.h>
 #include <inttypes.h>
 
 // Downsampling factor for guided-laplacian
@@ -121,20 +120,6 @@ typedef struct dt_iop_highlights_params_t
   float solid_color; // $MIN: 0.0 $MAX: 1.0 $DEFAULT: 0.0 $DESCRIPTION: "inpaint a flat color"
 } dt_iop_highlights_params_t;
 
-typedef struct dt_iop_highlights_gui_data_t
-{
-  GtkWidget *clip;
-  GtkWidget *mode;
-  GtkWidget *noise_level;
-  GtkWidget *iterations;
-  GtkWidget *scales;
-  GtkWidget *solid_color;
-  GtkWidget *candidating;
-  GtkWidget *combine;
-  GtkWidget *recovery;
-  GtkWidget *strength;
-  dt_highlights_mask_t hlr_mask_mode;
-} dt_iop_highlights_gui_data_t;
 
 typedef dt_iop_highlights_params_t dt_iop_highlights_data_t;
 
@@ -536,7 +521,6 @@ int process_cl(dt_iop_module_t *self,
 {
   dt_dev_pixelpipe_t *pipe = piece->pipe;
   dt_iop_highlights_data_t *d = piece->data;
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
   dt_iop_highlights_global_data_t *gd = self->global_data;
 
   const uint32_t filters = pipe->dsc.filters;
@@ -564,40 +548,6 @@ int process_cl(dt_iop_module_t *self,
   cl_mem dev_xtrans = NULL;
   cl_mem dev_clips = NULL;
 
-  if(g && fullpipe)
-  {
-    if(g->hlr_mask_mode != DT_HIGHLIGHTS_MASK_OFF)
-    {
-      pipe->mask_display = DT_DEV_PIXELPIPE_DISPLAY_PASSTHRU;
-      if(g->hlr_mask_mode == DT_HIGHLIGHTS_MASK_CLIPPED)
-      {
-        const float mclip = d->clip * highlights_clip_magics[d->mode];
-        const float *c = pipe->dsc.temperature.coeffs;
-        float clips[4] = { mclip * (c[RED]   <= 0.0f ? 1.0f : c[RED]),
-                           mclip * (c[GREEN] <= 0.0f ? 1.0f : c[GREEN]),
-                           mclip * (c[BLUE]  <= 0.0f ? 1.0f : c[BLUE]),
-                           mclip * (c[GREEN] <= 0.0f ? 1.0f : c[GREEN]) };
-
-        dev_clips = dt_opencl_copy_host_to_device_constant(devid, 4 * sizeof(float), clips);
-        if(dev_clips == NULL) goto finish;
-
-        dev_xtrans = dt_opencl_copy_host_to_device_constant(devid, sizeof(pipe->dsc.xtrans), pipe->dsc.xtrans);
-        if(dev_xtrans == NULL) goto finish;
-        const int dy = roi_out->y - roi_in->y;
-        const int dx = roi_out->x - roi_in->x;
-
-        err = dt_opencl_enqueue_kernel_2d_args(devid, gd->kernel_highlights_false_color, roi_out->width, roi_out->height,
-          CLARG(dev_in), CLARG(dev_out),
-          CLARG(roi_out->width), CLARG(roi_out->height),
-          CLARG(roi_in->width), CLARG(roi_in->height),
-          CLARG(dx), CLARG(dy),
-          CLARG(filters), CLARG(dev_xtrans),
-          CLARG(dev_clips));
-        announce = FALSE;
-        goto finish;
-      }
-    }
-  }
 
   const float clip = d->clip * dt_iop_get_processed_minimum(piece);
 
@@ -837,7 +787,6 @@ void process(dt_iop_module_t *self,
   dt_dev_pixelpipe_t *pipe = piece->pipe;
   const uint32_t filters = pipe->dsc.filters;
   dt_iop_highlights_data_t *d = piece->data;
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
 
   if(pipe->mask_display == DT_DEV_PIXELPIPE_DISPLAY_PASSTHRU)
   {
@@ -868,27 +817,6 @@ void process(dt_iop_module_t *self,
     return;
   }
 
-  if(g && fullpipe)
-  {
-    if(g->hlr_mask_mode != DT_HIGHLIGHTS_MASK_OFF)
-    {
-      pipe->mask_display = DT_DEV_PIXELPIPE_DISPLAY_PASSTHRU;
-      if(g->hlr_mask_mode == DT_HIGHLIGHTS_MASK_CLIPPED)
-      {
-        if(scaled)
-        {
-          process_visualize(piece, ivoid, out, roi_in, roi_in, d);
-          dt_iop_clip_and_zoom_roi((float *)ovoid, out, roi_out, roi_in);
-          dt_free_align(out);
-        }
-        else
-          process_visualize(piece, ivoid, ovoid, roi_in, roi_out, d);
-
-        dt_iop_piece_clear_raster(piece, NULL);
-        return;
-      }
-    }
-  }
 
   /* While rendering thumnbnails we look for an acceptable lower quality */
   gboolean high_quality = TRUE;
@@ -1059,7 +987,6 @@ void commit_params(dt_iop_module_t *self,
 
   const gboolean fullpipe = piece->pipe->type & DT_DEV_PIXELPIPE_FULL;
 
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
   if(g && (g->hlr_mask_mode == DT_HIGHLIGHTS_MASK_CLIPPED) && linear && fullpipe)
     piece->process_cl_ready = FALSE;
 }
@@ -1134,92 +1061,6 @@ void cleanup_pipe(dt_iop_module_t *self, dt_dev_pixelpipe_t *pipe, dt_dev_pixelp
   piece->data = NULL;
 }
 
-static void _set_quads(dt_iop_highlights_gui_data_t *g, GtkWidget *w)
-{
-  g->hlr_mask_mode = w && dt_bauhaus_widget_get_quad_active(w)
-                   ? w == g->clip     ? DT_HIGHLIGHTS_MASK_CLIPPED
-                   : w == g->combine  ? DT_HIGHLIGHTS_MASK_COMBINE
-                   : w == g->strength ? DT_HIGHLIGHTS_MASK_STRENGTH
-                   : DT_HIGHLIGHTS_MASK_CANDIDATING
-                   : DT_HIGHLIGHTS_MASK_OFF;
-  if(w != g->clip       ) dt_bauhaus_widget_set_quad_active(g->clip,        FALSE);
-  if(w != g->candidating) dt_bauhaus_widget_set_quad_active(g->candidating, FALSE);
-  if(w != g->combine    ) dt_bauhaus_widget_set_quad_active(g->combine,     FALSE);
-  if(w != g->strength   ) dt_bauhaus_widget_set_quad_active(g->strength,    FALSE);
-}
-
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
-  dt_iop_highlights_params_t *p = self->params;
-
-  const dt_image_t *img = &self->dev->image_storage;
-  const uint32_t filters = img->buf_dsc.filters;
-  const gboolean bayer = (filters != 0) && (filters != 9u);
-  const gboolean rawprep = dt_image_is_rawprepare_supported(img);
-
-  /* Sanitize mode if wrongfully
-   - copied as part of the history of another pic or by preset / style or
-   - by old edits that allowed opposed for non-raws
-  */
-  if(!rawprep)
-  {
-    p->mode = DT_IOP_HIGHLIGHTS_CLIP;
-    dt_bauhaus_combobox_set_from_value(g->mode, p->mode);
-    // not reported visually as so common and not relevant
-  }
-
-  if((!bayer && (p->mode == DT_IOP_HIGHLIGHTS_LAPLACIAN))
-    || ((filters == 0) && (p->mode == DT_IOP_HIGHLIGHTS_LCH
-        || p->mode == DT_IOP_HIGHLIGHTS_INPAINT
-        || p->mode == DT_IOP_HIGHLIGHTS_SEGMENTS)))
-  {
-    p->mode = DT_IOP_HIGHLIGHTS_OPPOSED;
-    dt_bauhaus_combobox_set_from_value(g->mode, p->mode);
-    dt_control_log(_("highlights: mode not available for this type of image. falling back to inpaint opposed."));
-  }
-
-  const gboolean use_laplacian = bayer && p->mode == DT_IOP_HIGHLIGHTS_LAPLACIAN;
-  const gboolean use_segmentation = p->mode == DT_IOP_HIGHLIGHTS_SEGMENTS;
-  const gboolean use_recovery = use_segmentation && (p->recovery != DT_RECOVERY_MODE_OFF);
-
-  gtk_widget_set_visible(g->noise_level, use_laplacian || use_recovery);
-  gtk_widget_set_visible(g->iterations, use_laplacian);
-  gtk_widget_set_visible(g->scales, use_laplacian);
-  gtk_widget_set_visible(g->solid_color, use_laplacian);
-
-  gtk_widget_set_visible(g->candidating, use_segmentation);
-  gtk_widget_set_visible(g->combine, use_segmentation);
-  gtk_widget_set_visible(g->recovery, use_segmentation);
-  gtk_widget_set_visible(g->strength, use_recovery);
-  dt_bauhaus_widget_set_quad_visibility(g->strength, use_recovery);
-
-  // The special case for strength button active needs further care here
-  if((use_segmentation && (p->recovery == DT_RECOVERY_MODE_OFF)) && (g->hlr_mask_mode == DT_HIGHLIGHTS_MASK_STRENGTH))
-  {
-    dt_bauhaus_widget_set_quad_active(g->strength, FALSE);
-    g->hlr_mask_mode = DT_HIGHLIGHTS_MASK_OFF;
-  }
-
-  if(w == g->mode)
-  {
-    _set_quads(g, NULL);
-  }
-}
-
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
-  const dt_image_t *img = &self->dev->image_storage;
-  const gboolean monochrome = dt_image_is_monochrome(img);
-  // enable this per default if raw or sraw if not real monochrome
-  self->default_enabled = dt_image_is_rawprepare_supported(img) && !monochrome;
-  self->hide_enable_button = monochrome;
-  gtk_stack_set_visible_child_name(GTK_STACK(self->widget), !monochrome ? "default" : "notapplicable");
-  _set_quads(g, NULL);
-
-  gui_changed(self, NULL, NULL);
-}
 
 void reload_defaults(dt_iop_module_t *self)
 {
@@ -1238,135 +1079,12 @@ void reload_defaults(dt_iop_module_t *self)
   self->hide_enable_button = monochrome;
 
   if(self->widget)
-    gtk_stack_set_visible_child_name(GTK_STACK(self->widget), !monochrome ? "default" : "notapplicable");
 
   dt_iop_highlights_params_t *d = self->default_params;
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
-  if(g)
-  {
-    // rebuild the complete menu depending on sensor type and possibly active but obsolete mode
-    dt_bauhaus_combobox_clear(g->mode);
-
-    dt_introspection_type_enum_tuple_t *values = self->so->get_f("mode")->Enum.values;
-
-    if(!rawprep)
-    {
-      dt_bauhaus_combobox_add_introspection(g->mode, NULL, values, DT_IOP_HIGHLIGHTS_CLIP,
-                                                                   DT_IOP_HIGHLIGHTS_OPPOSED);
-      // As we only have clip available we remove all other options
-      for(int i = 0; i < 6; i++) dt_bauhaus_combobox_remove_at(g->mode, 1);
-    }
-    else if(sraw)
-    {
-      dt_bauhaus_combobox_add_introspection(g->mode, NULL, values, DT_IOP_HIGHLIGHTS_OPPOSED,
-                                                                   DT_IOP_HIGHLIGHTS_OPPOSED);
-      dt_bauhaus_combobox_add_introspection(g->mode, NULL, values, DT_IOP_HIGHLIGHTS_CLIP,
-                                                                   DT_IOP_HIGHLIGHTS_CLIP);
-    }
-    else
-    {
-      dt_bauhaus_combobox_add_introspection(g->mode, NULL, values, DT_IOP_HIGHLIGHTS_OPPOSED,
-                                                                   xtrans
-                                                                   ? DT_IOP_HIGHLIGHTS_SEGMENTS
-                                                                   : DT_IOP_HIGHLIGHTS_LAPLACIAN);
-    }
-    _set_quads(g, NULL);
-  }
   d->clip = MIN(d->clip, img->linear_response_limit);
   d->mode = rawprep ? DT_IOP_HIGHLIGHTS_OPPOSED : DT_IOP_HIGHLIGHTS_CLIP;
 }
 
-static void _quad_callback(GtkWidget *quad, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
-  _set_quads(g, quad);
-  dt_dev_reprocess_center(self->dev);
-}
-
-void gui_focus(dt_iop_module_t *self, gboolean in)
-{
-  dt_iop_highlights_gui_data_t *g = self->gui_data;
-  if(!in)
-  {
-    const gboolean was_visualize = (g->hlr_mask_mode != DT_HIGHLIGHTS_MASK_OFF);
-    _set_quads(g, NULL);
-    if(was_visualize) dt_dev_reprocess_center(self->dev);
-  }
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_highlights_gui_data_t *g = IOP_GUI_ALLOC(highlights);
-  GtkWidget *box_raw = self->widget = dt_gui_vbox();
-
-  g->mode = dt_bauhaus_combobox_from_params(self, "mode");
-  gtk_widget_set_tooltip_text(g->mode, _("highlight reconstruction method"));
-
-  g->clip = dt_bauhaus_slider_from_params(self, "clip");
-  dt_bauhaus_slider_set_digits(g->clip, 3);
-  gtk_widget_set_tooltip_text(g->clip,
-                              _("manually adjust the clipping threshold mostly used against magenta highlights.\n"
-                                "you might use this for tuning 'laplacian', 'inpaint opposed' or 'segmentation' modes,\n"
-                                "especially if camera white point is incorrect."));
-  dt_bauhaus_widget_set_quad(g->clip, self, dtgtk_cairo_paint_showmask, TRUE, _quad_callback,
-    _("visualize clipped highlights in a false color representation.\n"
-      "the effective clipping level also depends on the reconstruction method."));
-
-  g->combine = dt_bauhaus_slider_from_params(self, "combine");
-  dt_bauhaus_slider_set_digits(g->combine, 0);
-  gtk_widget_set_tooltip_text(g->combine, _("combine closely related clipped segments by morphological operations.\n"
-                                            "this often leads to improved color reconstruction for tiny segments before dark background."));
-  dt_bauhaus_widget_set_quad(g->combine, self, dtgtk_cairo_paint_showmask, TRUE, _quad_callback,
-    _("visualize the combined segments in a false color representation."));
-
-  g->candidating = dt_bauhaus_slider_from_params(self, "candidating");
-  gtk_widget_set_tooltip_text(g->candidating, _("select inpainting after segmentation analysis.\n"
-                                                "increase to favor candidates found in segmentation analysis, decrease for opposed means inpainting."));
-  dt_bauhaus_slider_set_format(g->candidating, "%");
-  dt_bauhaus_slider_set_digits(g->candidating, 0);
-  dt_bauhaus_widget_set_quad(g->candidating, self, dtgtk_cairo_paint_showmask, TRUE, _quad_callback,
-    _("visualize segments that are considered to have a good candidate in a false color representation."));
-
-  g->recovery = dt_bauhaus_combobox_from_params(self, "recovery");
-  gtk_widget_set_tooltip_text(g->recovery, _("approximate lost data in regions with all photosites clipped, the effect depends on segment size and border gradients.\n"
-                                             "choose a mode tuned for segment size or the generic mode that tries to find best settings for every segment.\n"
-                                             "small means areas with a diameter less than 25 pixels, large is best for greater than 100.\n"
-                                             "the flat modes ignore narrow unclipped structures (like powerlines) to keep highlights rebuilt and avoid gradients."));
-
-  g->strength = dt_bauhaus_slider_from_params(self, "strength");
-  gtk_widget_set_tooltip_text(g->strength, _("set strength of rebuilding in regions with all photosites clipped."));
-  dt_bauhaus_slider_set_format(g->strength, "%");
-  dt_bauhaus_slider_set_digits(g->strength, 0);
-  dt_bauhaus_widget_set_quad(g->strength, self, dtgtk_cairo_paint_showmask, TRUE, _quad_callback,
-    _("show the effect that is added to already reconstructed data."));
-
-  g->noise_level = dt_bauhaus_slider_from_params(self, "noise_level");
-  gtk_widget_set_tooltip_text(g->noise_level, _("add noise to visually blend the reconstructed areas\n"
-                                                "into the rest of the noisy image. useful at high ISO."));
-
-  g->iterations = dt_bauhaus_slider_from_params(self, "iterations");
-  gtk_widget_set_tooltip_text(g->iterations, _("increase if magenta highlights don't get fully corrected\n"
-                                               "each new iteration brings a performance penalty."));
-
-  g->solid_color = dt_bauhaus_slider_from_params(self, "solid_color");
-  dt_bauhaus_slider_set_format(g->solid_color, "%");
-  gtk_widget_set_tooltip_text(g->solid_color, _("increase if magenta highlights don't get fully corrected.\n"
-                                                "this may produce non-smooth boundaries between valid and clipped regions."));
-
-  g->scales = dt_bauhaus_combobox_from_params(self, "scales");
-  gtk_widget_set_tooltip_text(g->scales, _("increase to correct larger clipped areas.\n"
-                                           "large values bring huge performance penalties"));
-
-  GtkWidget *notapplicable = dt_ui_label_new(_("not applicable"));
-  gtk_widget_set_tooltip_text(notapplicable, _("this module does not work with monochrome RAW files"));
-
-  // start building top level widget
-  self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
-  gtk_stack_add_named(GTK_STACK(self->widget), notapplicable, "notapplicable");
-  gtk_stack_add_named(GTK_STACK(self->widget), box_raw, "default");
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

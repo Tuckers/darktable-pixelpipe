@@ -16,7 +16,6 @@
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "bauhaus/bauhaus.h"
 #include "common/colorspaces_inline_conversions.h"
 #include "common/debug.h"
 #include "common/imagebuf.h"
@@ -27,18 +26,11 @@
 #include "develop/develop.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "develop/tiling.h"
-#include "dtgtk/drawingarea.h"
-#include "gui/draw.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
-#include "gui/accelerators.h"
 #include "iop/iop_api.h"
 
 #include <regex.h>
 #include <assert.h>
-#include <gtk/gtk.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -230,23 +222,6 @@ int legacy_params(dt_iop_module_t *self,
   return 1;
 }
 
-typedef struct dt_iop_basecurve_gui_data_t
-{
-  dt_draw_curve_t *minmax_curve; // curve for gui to draw
-  int minmax_curve_type, minmax_curve_nodes;
-  GtkBox *hbox;
-  GtkDrawingArea *area;
-  GtkWidget *fusion, *exposure_step, *exposure_bias;
-  GtkWidget *cmb_preserve_colors;
-  double mouse_x, mouse_y;
-  int selected;
-  double selected_offset, selected_y, selected_min, selected_max;
-  float draw_xs[DT_IOP_TONECURVE_RES], draw_ys[DT_IOP_TONECURVE_RES];
-  float draw_min_xs[DT_IOP_TONECURVE_RES], draw_min_ys[DT_IOP_TONECURVE_RES];
-  float draw_max_xs[DT_IOP_TONECURVE_RES], draw_max_ys[DT_IOP_TONECURVE_RES];
-  float loglogscale;
-  GtkWidget *logbase;
-} dt_iop_basecurve_gui_data_t;
 
 typedef struct basecurve_preset_t
 {
@@ -355,7 +330,6 @@ typedef struct dt_iop_basecurve_global_data_t
   int kernel_basecurve_reconstruct;
   int kernel_basecurve_finalize;
 } dt_iop_basecurve_global_data_t;
-
 
 
 const char *name()
@@ -1494,24 +1468,6 @@ void cleanup_pipe(dt_iop_module_t *self,
   piece->data = NULL;
 }
 
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_basecurve_params_t *p = self->params;
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-
-  gtk_widget_set_visible(g->exposure_step, p->exposure_fusion != 0);
-  gtk_widget_set_visible(g->exposure_bias, p->exposure_fusion != 0);
-
-  // gui curve is read directly from params during expose event.
-  gtk_widget_queue_draw(GTK_WIDGET(g->area));
-}
-
-static float eval_grey(float x)
-{
-  // "log base" is a combined scaling and offset change so that x->[0,1], with
-  // the left side of the histogram expanded (slider->right) or not (slider left, linear)
-  return x;
-}
 
 void init(dt_iop_module_t *self)
 {
@@ -1565,16 +1521,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-static gboolean dt_iop_basecurve_leave_notify(GtkWidget *widget,
-                                              GdkEventCrossing *event,
-                                              dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-  if(!(event->state & GDK_BUTTON1_MASK))
-    g->selected = -1;
-  gtk_widget_queue_draw(widget);
-  return FALSE;
-}
 
 static float to_log(const float x, const float base)
 {
@@ -1592,159 +1538,6 @@ static float to_lin(const float x, const float base)
     return x;
 }
 
-static gboolean dt_iop_basecurve_draw(GtkWidget *widget, cairo_t *crf, dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-  dt_iop_basecurve_params_t *p = self->params;
-
-  int nodes = p->basecurve_nodes[0];
-  dt_iop_basecurve_node_t *basecurve = p->basecurve[0];
-  if(g->minmax_curve_type != p->basecurve_type[0] || g->minmax_curve_nodes != p->basecurve_nodes[0])
-  {
-    dt_draw_curve_destroy(g->minmax_curve);
-    g->minmax_curve = dt_draw_curve_new(0.0, 1.0, p->basecurve_type[0]);
-    g->minmax_curve_nodes = p->basecurve_nodes[0];
-    g->minmax_curve_type = p->basecurve_type[0];
-    for(int k = 0; k < p->basecurve_nodes[0]; k++)
-      (void)dt_draw_curve_add_point(g->minmax_curve, p->basecurve[0][k].x, p->basecurve[0][k].y);
-  }
-  else
-  {
-    for(int k = 0; k < p->basecurve_nodes[0]; k++)
-      dt_draw_curve_set_point(g->minmax_curve, k, p->basecurve[0][k].x, p->basecurve[0][k].y);
-  }
-  dt_draw_curve_t *minmax_curve = g->minmax_curve;
-  dt_draw_curve_calc_values(minmax_curve, 0.0, 1.0, DT_IOP_TONECURVE_RES, g->draw_xs, g->draw_ys);
-
-  float unbounded_coeffs[3];
-  const float xm = basecurve[nodes - 1].x;
-  {
-    const float x[4] = { 0.7f * xm, 0.8f * xm, 0.9f * xm, 1.0f * xm };
-    const float y[4] = { g->draw_ys[CLAMP((int)(x[0] * DT_IOP_TONECURVE_RES), 0, DT_IOP_TONECURVE_RES - 1)],
-                         g->draw_ys[CLAMP((int)(x[1] * DT_IOP_TONECURVE_RES), 0, DT_IOP_TONECURVE_RES - 1)],
-                         g->draw_ys[CLAMP((int)(x[2] * DT_IOP_TONECURVE_RES), 0, DT_IOP_TONECURVE_RES - 1)],
-                         g->draw_ys[CLAMP((int)(x[3] * DT_IOP_TONECURVE_RES), 0, DT_IOP_TONECURVE_RES - 1)] };
-    dt_iop_estimate_exp(x, y, 4, unbounded_coeffs);
-  }
-
-  const int inset = DT_GUI_CURVE_EDITOR_INSET;
-  GtkAllocation allocation;
-  gtk_widget_get_allocation(widget, &allocation);
-  int width = allocation.width, height = allocation.height;
-  cairo_surface_t *cst = dt_cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
-  cairo_t *cr = cairo_create(cst);
-  // clear bg
-  cairo_set_source_rgb(cr, .2, .2, .2);
-  cairo_paint(cr);
-
-  cairo_translate(cr, inset, inset);
-  width -= 2 * inset;
-  height -= 2 * inset;
-
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(1.0));
-  cairo_set_source_rgb(cr, .1, .1, .1);
-  cairo_rectangle(cr, 0, 0, width, height);
-  cairo_stroke(cr);
-
-  cairo_set_source_rgb(cr, .3, .3, .3);
-  cairo_rectangle(cr, 0, 0, width, height);
-  cairo_fill(cr);
-
-  cairo_translate(cr, 0, height);
-  if(g->selected >= 0)
-  {
-    char text[30];
-    // draw information about current selected node
-    PangoLayout *layout;
-    PangoRectangle ink;
-    PangoFontDescription *desc = pango_font_description_copy_static(darktable.bauhaus->pango_font_desc);
-    pango_font_description_set_weight(desc, PANGO_WEIGHT_BOLD);
-    pango_font_description_set_absolute_size(desc, PANGO_SCALE);
-    layout = pango_cairo_create_layout(cr);
-    pango_layout_set_font_description(layout, desc);
-
-    const float x_node_value = basecurve[g->selected].x * 100;
-    const float y_node_value = basecurve[g->selected].y * 100;
-    const float d_node_value = y_node_value - x_node_value;
-    // scale conservatively to 100% of width:
-    snprintf(text, sizeof(text), "100.00 / 100.00 ( +100.00)");
-    pango_layout_set_text(layout, text, -1);
-    pango_layout_get_pixel_extents(layout, &ink, NULL);
-    pango_font_description_set_absolute_size(desc, (double)width / ink.width * PANGO_SCALE);
-    pango_layout_set_font_description(layout, desc);
-
-    snprintf(text, sizeof(text), "%.2f / %.2f ( %+.2f)", x_node_value, y_node_value, d_node_value);
-
-    cairo_set_source_rgb(cr, 0.1, 0.1, 0.1);
-    pango_layout_set_text(layout, text, -1);
-    pango_layout_get_pixel_extents(layout, &ink, NULL);
-    cairo_move_to(cr, 0.98f * width - ink.width - ink.x, -0.02 * height - ink.height - ink.y);
-    pango_cairo_show_layout(cr, layout);
-    cairo_stroke(cr);
-    pango_font_description_free(desc);
-    g_object_unref(layout);
-  }
-  cairo_scale(cr, 1.0f, -1.0f);
-
-  // draw grid
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(.4));
-  cairo_set_source_rgb(cr, .1, .1, .1);
-  if(g->loglogscale)
-    dt_draw_loglog_grid(cr, 4, 0, 0, width, height, g->loglogscale + 1.0f);
-  else
-    dt_draw_grid(cr, 4, 0, 0, width, height);
-
-  // draw nodes positions
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(1.));
-  cairo_set_source_rgb(cr, 0.6, 0.6, 0.6);
-  for(int k = 0; k < nodes; k++)
-  {
-    const float x = to_log(basecurve[k].x, g->loglogscale), y = to_log(basecurve[k].y, g->loglogscale);
-    cairo_arc(cr, x * width, y * height, DT_PIXEL_APPLY_DPI(3), 0, 2. * M_PI);
-    cairo_stroke(cr);
-  }
-
-  // draw selected cursor
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(1.));
-
-  if(g->selected >= 0)
-  {
-    cairo_set_source_rgb(cr, .9, .9, .9);
-    const float x = to_log(basecurve[g->selected].x, g->loglogscale),
-                y = to_log(basecurve[g->selected].y, g->loglogscale);
-    cairo_arc(cr, x * width, y * height, DT_PIXEL_APPLY_DPI(4), 0, 2. * M_PI);
-    cairo_stroke(cr);
-  }
-
-  // draw curve
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(2.));
-  cairo_set_source_rgb(cr, .9, .9, .9);
-  // cairo_set_line_cap  (cr, CAIRO_LINE_CAP_SQUARE);
-  cairo_move_to(cr, 0, height * to_log(g->draw_ys[0], g->loglogscale));
-  for(int k = 1; k < DT_IOP_TONECURVE_RES; k++)
-  {
-    const float xx = k / (DT_IOP_TONECURVE_RES - 1.0f);
-    if(xx > xm)
-    {
-      const float yy = dt_iop_eval_exp(unbounded_coeffs, xx);
-      const float x = to_log(xx, g->loglogscale), y = to_log(yy, g->loglogscale);
-      cairo_line_to(cr, x * width, height * y);
-    }
-    else
-    {
-      const float yy = g->draw_ys[k];
-      const float x = to_log(xx, g->loglogscale), y = to_log(yy, g->loglogscale);
-      cairo_line_to(cr, x * width, height * y);
-    }
-  }
-  cairo_stroke(cr);
-
-  cairo_destroy(cr);
-  cairo_set_source_surface(crf, cst, 0, 0);
-  cairo_paint(crf);
-  cairo_surface_destroy(cst);
-  return TRUE;
-}
 
 static inline int _add_node(dt_iop_basecurve_node_t *basecurve, int *nodes, float x, float y)
 {
@@ -1775,34 +1568,6 @@ static inline int _add_node(dt_iop_basecurve_node_t *basecurve, int *nodes, floa
   return selected;
 }
 
-static void dt_iop_basecurve_sanity_check(dt_iop_module_t *self, GtkWidget *widget)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-  dt_iop_basecurve_params_t *p = self->params;
-
-  int ch = 0;
-  int nodes = p->basecurve_nodes[ch];
-  dt_iop_basecurve_node_t *basecurve = p->basecurve[ch];
-
-  if(nodes <= 2) return;
-
-  const float mx = basecurve[g->selected].x;
-
-  // delete vertex if order has changed
-  // for all points, x coordinate of point must be strictly larger than
-  // the x coordinate of the previous point
-  if((g->selected > 0 && (basecurve[g->selected - 1].x >= mx))
-     || (g->selected < nodes - 1 && (basecurve[g->selected + 1].x <= mx)))
-  {
-    for(int k = g->selected; k < nodes - 1; k++)
-    {
-      basecurve[k].x = basecurve[k + 1].x;
-      basecurve[k].y = basecurve[k + 1].y;
-    }
-    g->selected = -2; // avoid re-insertion of that point immediately after this
-    p->basecurve_nodes[ch]--;
-  }
-}
 
 static gboolean _move_point_internal(dt_iop_module_t *self,
                                      GtkWidget *widget,
@@ -1814,7 +1579,6 @@ static gboolean dt_iop_basecurve_motion_notify(GtkWidget *widget,
                                                GdkEventMotion *event,
                                                dt_iop_module_t *self)
 {
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
   dt_iop_basecurve_params_t *p = self->params;
   int ch = 0;
   int nodes = p->basecurve_nodes[ch];
@@ -1880,120 +1644,6 @@ static gboolean dt_iop_basecurve_motion_notify(GtkWidget *widget,
   return TRUE;
 }
 
-static gboolean dt_iop_basecurve_button_press(GtkWidget *widget,
-                                              GdkEventButton *event,
-                                              dt_iop_module_t *self)
-{
-  dt_iop_basecurve_params_t *p = self->params;
-  const dt_iop_basecurve_params_t *const d = self->default_params;
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-
-  int ch = 0;
-  int nodes = p->basecurve_nodes[ch];
-  dt_iop_basecurve_node_t *basecurve = p->basecurve[ch];
-
-  if(event->button == GDK_BUTTON_PRIMARY)
-  {
-    if(event->type == GDK_BUTTON_PRESS && dt_modifier_is(event->state, GDK_CONTROL_MASK)
-      && nodes < MAXNODES && g->selected == -1)
-    {
-      // if we are not on a node -> add a new node at the current x of the pointer and y of the curve at that x
-      const int inset = DT_GUI_CURVE_EDITOR_INSET;
-      GtkAllocation allocation;
-      gtk_widget_get_allocation(widget, &allocation);
-      int width = allocation.width - 2 * inset;
-      g->mouse_x = event->x - inset;
-      g->mouse_y = event->y - inset;
-
-      const float mx = CLAMP(g->mouse_x, 0, width) / (float)width;
-      const float linx = to_lin(mx, g->loglogscale);
-
-      // don't add a node too close to others in x direction, it can crash dt
-      int selected = -1;
-      if(basecurve[0].x > linx)
-        selected = 0;
-      else
-      {
-        for(int k = 1; k < nodes; k++)
-        {
-          if(basecurve[k].x > linx)
-          {
-            selected = k;
-            break;
-          }
-        }
-      }
-      if(selected == -1) selected = nodes;
-      // > 0 -> check distance to left neighbour
-      // < nodes -> check distance to right neighbour
-      if(!((selected > 0 && linx - basecurve[selected - 1].x <= 0.025) ||
-           (selected < nodes && basecurve[selected].x - linx <= 0.025)))
-      {
-        // evaluate the curve at the current x position
-        const float y = dt_draw_curve_calc_value(g->minmax_curve, linx);
-
-        if(y >= 0.0 && y <= 1.0) // never add something outside the viewport, you couldn't change it afterwards
-        {
-          // create a new node
-          selected = _add_node(basecurve, &p->basecurve_nodes[ch], linx, y);
-
-          // maybe set the new one as being selected
-          float min = .04f;
-          min *= min; // comparing against square
-          for(int k = 0; k < nodes; k++)
-          {
-            float other_y = to_log(basecurve[k].y, g->loglogscale);
-            float dist = (y - other_y) * (y - other_y);
-            if(dist < min) g->selected = selected;
-          }
-
-          dt_dev_add_history_item_target(darktable.develop, self, TRUE, widget);
-          gtk_widget_queue_draw(GTK_WIDGET(g->area));
-        }
-      }
-      return TRUE;
-    }
-    else if(event->type == GDK_2BUTTON_PRESS)
-    {
-      // reset current curve
-      p->basecurve_nodes[ch] = d->basecurve_nodes[ch];
-      p->basecurve_type[ch] = d->basecurve_type[ch];
-      for(int k = 0; k < d->basecurve_nodes[ch]; k++)
-      {
-        p->basecurve[ch][k].x = d->basecurve[ch][k].x;
-        p->basecurve[ch][k].y = d->basecurve[ch][k].y;
-      }
-      g->selected = -2; // avoid motion notify re-inserting immediately.
-      dt_dev_add_history_item_target(darktable.develop, self, TRUE, widget);
-      gtk_widget_queue_draw(GTK_WIDGET(g->area));
-      return TRUE;
-    }
-  }
-  else if(event->button == GDK_BUTTON_SECONDARY && g->selected >= 0)
-  {
-    if(g->selected == 0 || g->selected == nodes - 1)
-    {
-      float reset_value = g->selected == 0 ? 0 : 1;
-      basecurve[g->selected].y = basecurve[g->selected].x = reset_value;
-      gtk_widget_queue_draw(GTK_WIDGET(g->area));
-      dt_dev_add_history_item_target(darktable.develop, self, TRUE, widget);
-      return TRUE;
-    }
-
-    for(int k = g->selected; k < nodes - 1; k++)
-    {
-      basecurve[k].x = basecurve[k + 1].x;
-      basecurve[k].y = basecurve[k + 1].y;
-    }
-    basecurve[nodes - 1].x = basecurve[nodes - 1].y = 0;
-    g->selected = -2; // avoid re-insertion of that point immediately after this
-    p->basecurve_nodes[ch]--;
-    gtk_widget_queue_draw(GTK_WIDGET(g->area));
-    dt_dev_add_history_item_target(darktable.develop, self, TRUE, widget);
-    return TRUE;
-  }
-  return FALSE;
-}
 
 static gboolean _move_point_internal(dt_iop_module_t *self,
                                      GtkWidget *widget,
@@ -2002,7 +1652,6 @@ static gboolean _move_point_internal(dt_iop_module_t *self,
                                      const guint state)
 {
   dt_iop_basecurve_params_t *p = self->params;
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
 
   const int ch = 0;
   dt_iop_basecurve_node_t *basecurve = p->basecurve[ch];
@@ -2023,159 +1672,9 @@ static gboolean _move_point_internal(dt_iop_module_t *self,
 
 #define BASECURVE_DEFAULT_STEP (0.001f)
 
-static gboolean _scrolled(GtkWidget *widget, GdkEventScroll *event, dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-
-  if(dt_gui_ignore_scroll(event)) return FALSE;
-
-  if(g->selected < 0) return TRUE;
-
-  gdouble delta_y;
-  if(dt_gui_get_scroll_delta(event, &delta_y))
-  {
-    delta_y *= -BASECURVE_DEFAULT_STEP;
-    return _move_point_internal(self, widget, 0.0, delta_y, event->state);
-  }
-
-  return TRUE;
-}
-
-static gboolean dt_iop_basecurve_key_press(GtkWidget *widget,
-                                           GdkEventKey *event,
-                                           dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-
-  if(g->selected < 0) return TRUE;
-
-  int handled = 0;
-  float dx = 0.0f, dy = 0.0f;
-  if(event->keyval == GDK_KEY_Up || event->keyval == GDK_KEY_KP_Up)
-  {
-    handled = 1;
-    dy = BASECURVE_DEFAULT_STEP;
-  }
-  else if(event->keyval == GDK_KEY_Down || event->keyval == GDK_KEY_KP_Down)
-  {
-    handled = 1;
-    dy = -BASECURVE_DEFAULT_STEP;
-  }
-  else if(event->keyval == GDK_KEY_Right || event->keyval == GDK_KEY_KP_Right)
-  {
-    handled = 1;
-    dx = BASECURVE_DEFAULT_STEP;
-  }
-  else if(event->keyval == GDK_KEY_Left || event->keyval == GDK_KEY_KP_Left)
-  {
-    handled = 1;
-    dx = -BASECURVE_DEFAULT_STEP;
-  }
-
-  if(!handled) return FALSE;
-
-  return _move_point_internal(self, widget, dx, dy, event->state);
-}
 
 #undef BASECURVE_DEFAULT_STEP
 
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  dt_iop_basecurve_params_t *p = self->params;
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-
-  if(w == g->fusion)
-  {
-    int prev = *(int *)previous;
-    if(p->exposure_fusion != 0 && prev == 0)
-    {
-      gtk_widget_set_visible(g->exposure_step, TRUE);
-      gtk_widget_set_visible(g->exposure_bias, TRUE);
-    }
-    if(p->exposure_fusion == 0 && prev != 0)
-    {
-      gtk_widget_set_visible(g->exposure_step, FALSE);
-      gtk_widget_set_visible(g->exposure_bias, FALSE);
-    }
-  }
-}
-
-static void logbase_callback(GtkWidget *slider, dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-  g->loglogscale = eval_grey(dt_bauhaus_slider_get(g->logbase));
-  gtk_widget_queue_draw(GTK_WIDGET(g->area));
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = IOP_GUI_ALLOC(basecurve);
-  const dt_iop_basecurve_params_t *const p = self->default_params;
-
-  g->minmax_curve = dt_draw_curve_new(0.0, 1.0, p->basecurve_type[0]);
-  g->minmax_curve_type = p->basecurve_type[0];
-  g->minmax_curve_nodes = p->basecurve_nodes[0];
-  for(int k = 0; k < p->basecurve_nodes[0]; k++)
-    (void)dt_draw_curve_add_point(g->minmax_curve, p->basecurve[0][k].x, p->basecurve[0][k].y);
-  g->mouse_x = g->mouse_y = -1.0;
-  g->selected = -1;
-  g->loglogscale = 0;
-
-  g->area = GTK_DRAWING_AREA(dtgtk_drawing_area_new_with_height(0));
-  gtk_widget_set_tooltip_text(GTK_WIDGET(g->area), _("abscissa: input, ordinate: output. works on RGB channels"));
-  g_object_set_data(G_OBJECT(g->area), "iop-instance", self);
-  dt_action_define_iop(self, NULL, N_("curve"), GTK_WIDGET(g->area), NULL);
-
-  self->widget = dt_gui_vbox(g->area);
-
-  g->cmb_preserve_colors = dt_bauhaus_combobox_from_params(self, "preserve_colors");
-  gtk_widget_set_tooltip_text(g->cmb_preserve_colors, _("method to preserve colors when applying contrast"));
-
-  g->fusion = dt_bauhaus_combobox_from_params(self, "exposure_fusion");
-  dt_bauhaus_combobox_add(g->fusion, _("none"));
-  dt_bauhaus_combobox_add(g->fusion, _("two exposures"));
-  dt_bauhaus_combobox_add(g->fusion, _("three exposures"));
-  gtk_widget_set_tooltip_text(g->fusion, _("fuse this image stopped up/down a couple of times with itself, to "
-                                           "compress high dynamic range. expose for the highlights before use."));
-
-  g->exposure_step = dt_bauhaus_slider_from_params(self, "exposure_stops");
-  dt_bauhaus_slider_set_digits(g->exposure_step, 3);
-  gtk_widget_set_tooltip_text(g->exposure_step, _("how many stops to shift the individual exposures apart"));
-  gtk_widget_set_no_show_all(g->exposure_step, TRUE);
-  gtk_widget_set_visible(g->exposure_step, p->exposure_fusion != 0 ? TRUE : FALSE);
-
-  // initially set to 1 (consistency with previous versions), but double-click resets to 0
-  // to get a quick way to reach 0 with the mouse.
-  g->exposure_bias = dt_bauhaus_slider_from_params(self, "exposure_bias");
-  dt_bauhaus_slider_set_default(g->exposure_bias, 0.0f);
-  dt_bauhaus_slider_set_digits(g->exposure_bias, 3);
-  gtk_widget_set_tooltip_text(g->exposure_bias, _("whether to shift exposure up or down "
-                                                  "(-1: reduce highlight, +1: reduce shadows)"));
-  gtk_widget_set_no_show_all(g->exposure_bias, TRUE);
-  gtk_widget_set_visible(g->exposure_bias, p->exposure_fusion != 0 ? TRUE : FALSE);
-
-  g->logbase = dt_bauhaus_slider_new_with_range(self, 0.0f, 40.0f, 0, 0.0f, 2);
-  dt_bauhaus_widget_set_label(g->logbase, NULL, N_("scale for graph"));
-  g_signal_connect(G_OBJECT(g->logbase), "value-changed", G_CALLBACK(logbase_callback), self);
-  dt_gui_box_add(self->widget, g->logbase);
-
-  gtk_widget_add_events(GTK_WIDGET(g->area), GDK_POINTER_MOTION_MASK | darktable.gui->scroll_mask
-                                           | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
-                                           | GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK);
-  gtk_widget_set_can_focus(GTK_WIDGET(g->area), TRUE);
-  g_signal_connect(G_OBJECT(g->area), "draw", G_CALLBACK(dt_iop_basecurve_draw), self);
-  g_signal_connect(G_OBJECT(g->area), "button-press-event", G_CALLBACK(dt_iop_basecurve_button_press), self);
-  g_signal_connect(G_OBJECT(g->area), "motion-notify-event", G_CALLBACK(dt_iop_basecurve_motion_notify), self);
-  g_signal_connect(G_OBJECT(g->area), "leave-notify-event", G_CALLBACK(dt_iop_basecurve_leave_notify), self);
-  g_signal_connect(G_OBJECT(g->area), "scroll-event", G_CALLBACK(_scrolled), self);
-  g_signal_connect(G_OBJECT(g->area), "key-press-event", G_CALLBACK(dt_iop_basecurve_key_press), self);
-}
-
-void gui_cleanup(dt_iop_module_t *self)
-{
-  dt_iop_basecurve_gui_data_t *g = self->gui_data;
-  dt_draw_curve_destroy(g->minmax_curve);
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

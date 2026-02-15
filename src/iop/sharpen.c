@@ -15,25 +15,19 @@
     You should have received a copy of the GNU General Public License
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "bauhaus/bauhaus.h"
 #include "common/imagebuf.h"
 #include "common/opencl.h"
 #include "control/control.h"
 #include "develop/develop.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "develop/tiling.h"
-#include "gui/accelerators.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "iop/iop_api.h"
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <gtk/gtk.h>
 #include <inttypes.h>
 
 DT_MODULE_INTROSPECTION(1, dt_iop_sharpen_params_t)
@@ -47,10 +41,6 @@ typedef struct dt_iop_sharpen_params_t
   float threshold; // $MIN: 0.0 $MAX: 100.0 $DEFAULT: 0.5
 } dt_iop_sharpen_params_t;
 
-typedef struct dt_iop_sharpen_gui_data_t
-{
-  GtkWidget *radius, *amount, *threshold;
-} dt_iop_sharpen_gui_data_t;
 
 typedef struct dt_iop_sharpen_data_t
 {
@@ -420,23 +410,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_sharpen_gui_data_t *g = IOP_GUI_ALLOC(sharpen);
-
-  g->radius = dt_bauhaus_slider_from_params(self, N_("radius"));
-  dt_bauhaus_slider_set_soft_max(g->radius, 8.0);
-  dt_bauhaus_slider_set_digits(g->radius, 3);
-  gtk_widget_set_tooltip_text(g->radius, _("spatial extent of the unblurring"));
-
-  g->amount = dt_bauhaus_slider_from_params(self, N_("amount"));
-  dt_bauhaus_slider_set_digits(g->amount, 3);
-  gtk_widget_set_tooltip_text(g->amount, _("strength of the sharpen"));
-
-  g->threshold = dt_bauhaus_slider_from_params(self, N_("threshold"));
-  dt_bauhaus_slider_set_digits(g->threshold, 3);
-  gtk_widget_set_tooltip_text(g->threshold, _("threshold to activate sharpen"));
-}
 
 #undef MAXR
 

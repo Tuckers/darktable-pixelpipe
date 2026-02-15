@@ -15,7 +15,6 @@
   You should have received a copy of the GNU General Public License
   along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "bauhaus/bauhaus.h"
 #include "common/colorspaces.h"
 #include "common/debug.h"
 #include "common/math.h"
@@ -25,13 +24,9 @@
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
 #include "develop/openmp_maths.h"
-#include "gui/accelerators.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "iop/iop_api.h"
 
 #include <assert.h>
-#include <gtk/gtk.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdlib.h>
@@ -90,12 +85,6 @@ typedef struct dt_iop_channelmixer_params_t
   _channelmixer_algorithm_t algorithm_version;
 } dt_iop_channelmixer_params_t;
 
-typedef struct dt_iop_channelmixer_gui_data_t
-{
-  GtkBox *vbox;
-  GtkWidget *output_channel;                          // Output channel
-  GtkWidget *scale_red, *scale_green, *scale_blue;    // red, green, blue
-} dt_iop_channelmixer_gui_data_t;
 
 typedef enum _channelmixer_operation_mode_t
 {
@@ -436,65 +425,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-static void red_callback(GtkWidget *slider, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_channelmixer_params_t *p = self->params;
-  dt_iop_channelmixer_gui_data_t *g = self->gui_data;
-  const int output_channel_index = dt_bauhaus_combobox_get(g->output_channel);
-  const float value = dt_bauhaus_slider_get(slider);
-  if(output_channel_index >= 0 && value != p->red[output_channel_index])
-  {
-    p->red[output_channel_index] = value;
-    dt_dev_add_history_item(darktable.develop, self, TRUE);
-  }
-}
-
-static void green_callback(GtkWidget *slider, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_channelmixer_params_t *p = self->params;
-  dt_iop_channelmixer_gui_data_t *g = self->gui_data;
-  const int output_channel_index = dt_bauhaus_combobox_get(g->output_channel);
-  const float value = dt_bauhaus_slider_get(slider);
-  if(output_channel_index >= 0 && value != p->green[output_channel_index])
-  {
-    p->green[output_channel_index] = value;
-    dt_dev_add_history_item(darktable.develop, self, TRUE);
-  }
-}
-
-static void blue_callback(GtkWidget *slider, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_channelmixer_params_t *p = self->params;
-  dt_iop_channelmixer_gui_data_t *g = self->gui_data;
-  const int output_channel_index = dt_bauhaus_combobox_get(g->output_channel);
-  const float value = dt_bauhaus_slider_get(slider);
-  if(output_channel_index >= 0 && value != p->blue[output_channel_index])
-  {
-    p->blue[output_channel_index] = value;
-    dt_dev_add_history_item(darktable.develop, self, TRUE);
-  }
-}
-
-static void output_callback(GtkComboBox *combo, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_channelmixer_params_t *p = self->params;
-  dt_iop_channelmixer_gui_data_t *g = self->gui_data;
-
-  const int output_channel_index = dt_bauhaus_combobox_get(g->output_channel);
-  if(output_channel_index >= 0)
-  {
-    dt_bauhaus_slider_set(g->scale_red, p->red[output_channel_index]);
-    dt_bauhaus_slider_set_default(g->scale_red, output_channel_index == CHANNEL_RED ? 1.0 : 0.0);
-    dt_bauhaus_slider_set(g->scale_green, p->green[output_channel_index]);
-    dt_bauhaus_slider_set_default(g->scale_green, output_channel_index == CHANNEL_GREEN ? 1.0 : 0.0);
-    dt_bauhaus_slider_set(g->scale_blue, p->blue[output_channel_index]);
-    dt_bauhaus_slider_set_default(g->scale_blue, output_channel_index == CHANNEL_BLUE ? 1.0 : 0.0);
-  }
-}
 
 void commit_params(dt_iop_module_t *self, dt_iop_params_t *p1, dt_dev_pixelpipe_t *pipe,
                    dt_dev_pixelpipe_iop_t *piece)
@@ -572,19 +502,6 @@ void cleanup_pipe(dt_iop_module_t *self, dt_dev_pixelpipe_t *pipe, dt_dev_pixelp
   piece->data = NULL;
 }
 
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_channelmixer_gui_data_t *g = self->gui_data;
-  dt_iop_channelmixer_params_t *p = self->params;
-
-  const int output_channel_index = dt_bauhaus_combobox_get(g->output_channel);
-  if(output_channel_index >= 0)
-  {
-    dt_bauhaus_slider_set(g->scale_red, p->red[output_channel_index]);
-    dt_bauhaus_slider_set(g->scale_green, p->green[output_channel_index]);
-    dt_bauhaus_slider_set(g->scale_blue, p->blue[output_channel_index]);
-  }
-}
 
 void init(dt_iop_module_t *self)
 {
@@ -596,44 +513,6 @@ void init(dt_iop_module_t *self)
   d->red[CHANNEL_RED] = d->green[CHANNEL_GREEN] = d->blue[CHANNEL_BLUE] = 1.0;
 }
 
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_channelmixer_gui_data_t *g = IOP_GUI_ALLOC(channelmixer);
-  const dt_iop_channelmixer_params_t *const p = self->default_params;
-
-  /* output */
-  g->output_channel = dt_bauhaus_combobox_new(self);
-  dt_bauhaus_widget_set_label(g->output_channel, NULL, N_("destination"));
-  dt_bauhaus_combobox_add(g->output_channel, _("hue"));
-  dt_bauhaus_combobox_add(g->output_channel, _("saturation"));
-  dt_bauhaus_combobox_add(g->output_channel, _("lightness"));
-  dt_bauhaus_combobox_add(g->output_channel, _("red"));
-  dt_bauhaus_combobox_add(g->output_channel, _("green"));
-  dt_bauhaus_combobox_add(g->output_channel, _("blue"));
-  dt_bauhaus_combobox_add(g->output_channel, C_("channelmixer", "gray"));
-  dt_bauhaus_combobox_set(g->output_channel, CHANNEL_RED);
-  g_signal_connect(G_OBJECT(g->output_channel), "value-changed", G_CALLBACK(output_callback), self);
-
-  /* red */
-  g->scale_red = dt_bauhaus_slider_new_with_range(self, -2.0, 2.0, 0, p->red[CHANNEL_RED], 3);
-  gtk_widget_set_tooltip_text(g->scale_red, _("amount of red channel in the output channel"));
-  dt_bauhaus_widget_set_label(g->scale_red, NULL, N_("red"));
-  g_signal_connect(G_OBJECT(g->scale_red), "value-changed", G_CALLBACK(red_callback), self);
-
-  /* green */
-  g->scale_green = dt_bauhaus_slider_new_with_range(self, -2.0, 2.0, 0, p->green[CHANNEL_RED], 3);
-  gtk_widget_set_tooltip_text(g->scale_green, _("amount of green channel in the output channel"));
-  dt_bauhaus_widget_set_label(g->scale_green, NULL, N_("green"));
-  g_signal_connect(G_OBJECT(g->scale_green), "value-changed", G_CALLBACK(green_callback), self);
-
-  /* blue */
-  g->scale_blue = dt_bauhaus_slider_new_with_range(self, -2.0, 2.0, 0, p->blue[CHANNEL_RED], 3);
-  gtk_widget_set_tooltip_text(g->scale_blue, _("amount of blue channel in the output channel"));
-  dt_bauhaus_widget_set_label(g->scale_blue, NULL, N_("blue"));
-  g_signal_connect(G_OBJECT(g->scale_blue), "value-changed", G_CALLBACK(blue_callback), self);
-
-  self->widget = dt_gui_vbox(g->output_channel, g->scale_red, g->scale_green, g->scale_blue);
-}
 
 void init_presets(dt_iop_module_so_t *self)
 {

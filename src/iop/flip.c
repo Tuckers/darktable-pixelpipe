@@ -17,7 +17,6 @@
 */
 #include <assert.h>
 #include <gdk/gdkkeysyms.h>
-#include <gtk/gtk.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stdlib.h>
@@ -30,12 +29,6 @@
 #include "control/control.h"
 #include "develop/develop.h"
 #include "develop/imageop.h"
-#include "develop/imageop_gui.h"
-#include "dtgtk/resetlabel.h"
-#include "gui/accelerators.h"
-#include "gui/draw.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "imageio/imageio_common.h"
 #include "iop/iop_api.h"
 
@@ -508,121 +501,6 @@ void reload_defaults(dt_iop_module_t *self)
   }
 }
 
-static void _crop_callback(dt_iop_module_t *self,
-                           const dt_image_orientation_t mode)
-{
-  dt_develop_t *dev = darktable.develop;
-  dt_iop_module_t *cropper = dev->cropping.flip_handler;
-
-  // FIXME: can we "compress" history here by checking for a flip/crop pair on top of history
-  // and a) drop the crop on top of history and b) compress flip in one step
-
-  dt_dev_add_history_item(dev, self, TRUE);
-  if(cropper && dev->cropping.flip_callback)
-    dev->cropping.flip_callback(cropper, mode);
-}
-
-static void do_rotate(dt_iop_module_t *self, uint32_t cw)
-{
-  dt_iop_flip_params_t *p = self->params;
-  dt_image_orientation_t orientation = p->orientation;
-
-  if(orientation == ORIENTATION_NULL)
-    orientation = dt_image_orientation(&self->dev->image_storage);
-
-  if(cw == 0)
-  {
-    if(orientation & ORIENTATION_SWAP_XY)
-      orientation ^= ORIENTATION_FLIP_Y;
-    else
-      orientation ^= ORIENTATION_FLIP_X;
-  }
-  else
-  {
-    if(orientation & ORIENTATION_SWAP_XY)
-      orientation ^= ORIENTATION_FLIP_X;
-    else
-      orientation ^= ORIENTATION_FLIP_Y;
-  }
-  orientation ^= ORIENTATION_SWAP_XY;
-
-  p->orientation = orientation;
-  _crop_callback(self, cw ? ORIENTATION_ROTATE_CW_90_DEG : ORIENTATION_ROTATE_CCW_90_DEG);
-}
-
-static void rotate_cw(GtkWidget *widget, dt_iop_module_t *self)
-{
-  do_rotate(self, 1);
-}
-
-static void rotate_ccw(GtkWidget *widget, dt_iop_module_t *self)
-{
-  do_rotate(self, 0);
-}
-
-static void _flip_h(GtkWidget *widget, dt_iop_module_t *self)
-{
-  dt_iop_flip_params_t *p = self->params;
-  dt_image_orientation_t orientation = p->orientation;
-
-  if(orientation == ORIENTATION_NULL)
-    orientation = dt_image_orientation(&self->dev->image_storage);
-
-  if(orientation & ORIENTATION_SWAP_XY)
-    p->orientation = orientation ^ ORIENTATION_FLIP_VERTICALLY;
-  else
-    p->orientation = orientation ^ ORIENTATION_FLIP_HORIZONTALLY;
-
-  _crop_callback(self, ORIENTATION_FLIP_HORIZONTALLY);
-}
-
-static void _flip_v(GtkWidget *widget, dt_iop_module_t *self)
-{
-  dt_iop_flip_params_t *p = self->params;
-
-  dt_image_orientation_t orientation = p->orientation;
-
-  if(orientation == ORIENTATION_NULL)
-    orientation = dt_image_orientation(&self->dev->image_storage);
-
-  if(orientation & ORIENTATION_SWAP_XY)
-    p->orientation = orientation ^ ORIENTATION_FLIP_HORIZONTALLY;
-  else
-    p->orientation = orientation ^ ORIENTATION_FLIP_VERTICALLY;
-
-  _crop_callback(self, ORIENTATION_FLIP_VERTICALLY);
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  self->gui_data = NULL;
-  dt_iop_flip_params_t *p = self->params;
-
-  GtkWidget *label = dtgtk_reset_label_new(_("transform"),
-                                           self, &p->orientation, sizeof(int32_t));
-  self->widget = dt_gui_hbox(label);
-
-  dt_iop_button_new(self, N_("rotate 90 degrees CCW"),
-                    G_CALLBACK(rotate_ccw), FALSE, GDK_KEY_bracketleft, 0,
-                    dtgtk_cairo_paint_refresh, 0, self->widget);
-
-  dt_iop_button_new(self, N_("rotate 90 degrees CW"),
-                    G_CALLBACK(rotate_cw), FALSE, GDK_KEY_bracketright, 0,
-                    dtgtk_cairo_paint_refresh, 1, self->widget);
-
-  dt_iop_button_new(self, N_("flip horizontally"),
-                    G_CALLBACK(_flip_h), FALSE, 0, 0, dtgtk_cairo_paint_flip, 1,
-                    self->widget);
-
-  dt_iop_button_new(self, N_("flip vertically"),
-                    G_CALLBACK(_flip_v), FALSE, 0, 0, dtgtk_cairo_paint_flip, 0,
-                    self->widget);
-}
-
-void gui_cleanup(dt_iop_module_t *self)
-{
-  self->gui_data = NULL;
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

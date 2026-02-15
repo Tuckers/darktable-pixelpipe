@@ -15,8 +15,12 @@
     You should have received a copy of the GNU General Public License
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
+/* NOTE: This file has been extracted from darktable for the pixelpipe
+ * extraction project. GUI-related code has been removed using
+ * scripts/strip_iop.py. Only image processing logic, parameter structs,
+ * and pipeline functions are retained.
+ */
 
-#include "bauhaus/bauhaus.h"
 #include "common/imagebuf.h"
 #include "common/iop_profile.h"
 #include "common/colormatrices.c"
@@ -26,8 +30,6 @@
 #include "common/opencl.h"
 #include "control/control.h"
 #include "develop/develop.h"
-#include "gui/gtk.h"
-#include "gui/accelerators.h"
 #include "imageio/imageio_jpeg.h"
 #include "imageio/imageio_png.h"
 #include "imageio/imageio_tiff.h"
@@ -38,7 +40,6 @@
 #include "imageio/imageio_heif.h"
 #endif
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "iop/iop_api.h"
 
 #include <assert.h>
@@ -56,8 +57,6 @@
 #define LUT_SAMPLES 0x10000
 
 DT_MODULE_INTROSPECTION(7, dt_iop_colorin_params_t)
-
-static void update_profile_list(dt_iop_module_t *self);
 
 typedef enum dt_iop_color_normalize_t
 {
@@ -80,12 +79,6 @@ typedef struct dt_iop_colorin_params_t
   char filename_work[DT_IOP_COLOR_ICC_LEN];
 } dt_iop_colorin_params_t;
 
-typedef struct dt_iop_colorin_gui_data_t
-{
-  GtkWidget *profile_combobox, *clipping_combobox, *work_combobox;
-  GList *image_profiles;
-  int n_image_profiles;
-} dt_iop_colorin_gui_data_t;
 
 typedef struct dt_iop_colorin_global_data_t
 {
@@ -489,99 +482,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-static void _profile_changed(GtkWidget *widget, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_request_focus(self);
-  dt_iop_colorin_params_t *p = self->params;
-  dt_iop_colorin_gui_data_t *g = self->gui_data;
-  int pos = dt_bauhaus_combobox_get(widget);
-  GList *prof;
-  if(pos < g->n_image_profiles)
-    prof = g->image_profiles;
-  else
-  {
-    prof = darktable.color_profiles->profiles;
-    pos -= g->n_image_profiles;
-  }
-  for(; prof; prof = g_list_next(prof))
-  {
-    dt_colorspaces_color_profile_t *pp = prof->data;
-    if(pp->in_pos == pos)
-    {
-      p->type = pp->type;
-      memcpy(p->filename, pp->filename, sizeof(p->filename));
-      dt_dev_add_history_item(darktable.develop, self, TRUE);
-
-      DT_CONTROL_SIGNAL_RAISE(DT_SIGNAL_CONTROL_PROFILE_USER_CHANGED,
-                              DT_COLORSPACES_PROFILE_TYPE_INPUT);
-      return;
-    }
-  }
-  // should really never happen.
-  dt_print(DT_DEBUG_ALWAYS,
-           "[colorin] color profile %s seems to have disappeared!",
-           dt_colorspaces_get_name(p->type, p->filename));
-}
-
-static void _workicc_changed(GtkWidget *widget, dt_iop_module_t *self)
-{
-  dt_iop_colorin_params_t *p = self->params;
-  if(darktable.gui->reset) return;
-
-  dt_iop_request_focus(self);
-
-  dt_colorspaces_color_profile_type_t type_work = DT_COLORSPACE_NONE;
-  char filename_work[DT_IOP_COLOR_ICC_LEN];
-
-  const int pos = dt_bauhaus_combobox_get(widget);
-  for(const GList *prof = darktable.color_profiles->profiles;
-      prof;
-      prof = g_list_next(prof))
-  {
-    dt_colorspaces_color_profile_t *pp = prof->data;
-    if(pp->work_pos == pos)
-    {
-      type_work = pp->type;
-      g_strlcpy(filename_work, pp->filename, sizeof(filename_work));
-      break;
-    }
-  }
-
-  if(type_work != DT_COLORSPACE_NONE)
-  {
-    p->type_work = type_work;
-    g_strlcpy(p->filename_work, filename_work, sizeof(p->filename_work));
-
-    const dt_iop_order_iccprofile_info_t *const work_profile =
-      dt_ioppr_add_profile_info_to_list(self->dev, p->type_work,
-                                        p->filename_work, DT_INTENT_PERCEPTUAL);
-    if(work_profile == NULL
-       || !dt_is_valid_colormatrix(work_profile->matrix_in[0][0])
-       || !dt_is_valid_colormatrix(work_profile->matrix_out[0][0]))
-    {
-      dt_print(DT_DEBUG_ALWAYS,
-               "[colorin] can't extract matrix from colorspace `%s',"
-               " it will be replaced by Rec2020 RGB!", p->filename_work);
-      dt_control_log(_("can't extract matrix from colorspace `%s'"
-                       ", it will be replaced by Rec2020 RGB!"), p->filename_work);
-
-    }
-    dt_dev_add_history_item(darktable.develop, self, TRUE);
-
-    DT_CONTROL_SIGNAL_RAISE(DT_SIGNAL_CONTROL_PROFILE_USER_CHANGED,
-                            DT_COLORSPACES_PROFILE_TYPE_WORK);
-
-    dt_dev_pixelpipe_rebuild(self->dev);
-  }
-  else
-  {
-    // should really never happen.
-    dt_print(DT_DEBUG_ALWAYS,
-             "[colorin] color profile %s seems to have disappeared!",
-             dt_colorspaces_get_name(p->type_work, p->filename_work));
-  }
-}
 
 static const dt_aligned_pixel_t zero = { 0.0f, 0.0f, 0.0f, 0.0f };
 static const dt_aligned_pixel_t one = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -1618,72 +1518,6 @@ void cleanup_pipe(dt_iop_module_t *self,
   piece->data = NULL;
 }
 
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_colorin_gui_data_t *g = self->gui_data;
-  dt_iop_colorin_params_t *p = self->params;
-
-  dt_bauhaus_combobox_set(g->clipping_combobox, p->normalize);
-
-  // working profile
-  int idx = -1;
-  for(const GList *prof = darktable.color_profiles->profiles;
-      prof;
-      prof = g_list_next(prof))
-  {
-    dt_colorspaces_color_profile_t *pp = prof->data;
-    if(pp->work_pos > -1
-       && pp->type == p->type_work
-       && (pp->type != DT_COLORSPACE_FILE
-           || dt_colorspaces_is_profile_equal(pp->filename, p->filename_work)))
-    {
-      idx = pp->work_pos;
-      break;
-    }
-  }
-
-  if(idx < 0)
-  {
-    idx = 0;
-    dt_print(DT_DEBUG_ALWAYS,
-             "[gui colorin] could not find requested working profile `%s'!",
-             dt_colorspaces_get_name(p->type_work, p->filename_work));
-  }
-  dt_bauhaus_combobox_set(g->work_combobox, idx);
-
-  for(const GList *prof = g->image_profiles;
-      prof;
-      prof = g_list_next(prof))
-  {
-    dt_colorspaces_color_profile_t *pp = prof->data;
-    if(pp->type == p->type
-       && (pp->type != DT_COLORSPACE_FILE
-           || dt_colorspaces_is_profile_equal(pp->filename, p->filename)))
-    {
-      dt_bauhaus_combobox_set(g->profile_combobox, pp->in_pos);
-      return;
-    }
-  }
-
-  for(const GList *prof = darktable.color_profiles->profiles;
-      prof;
-      prof = g_list_next(prof))
-  {
-    dt_colorspaces_color_profile_t *pp = prof->data;
-    if(pp->in_pos > -1
-       && pp->type == p->type
-       && (pp->type != DT_COLORSPACE_FILE
-           || dt_colorspaces_is_profile_equal(pp->filename, p->filename)))
-    {
-      dt_bauhaus_combobox_set(g->profile_combobox, pp->in_pos + g->n_image_profiles);
-      return;
-    }
-  }
-  dt_bauhaus_combobox_set(g->profile_combobox, 0);
-
-  dt_print(DT_DEBUG_PIPE, "[gui colorin] using default instead of `%s'",
-             dt_colorspaces_get_name(p->type, p->filename));
-}
 
 // FIXME: update the gui when we add/remove the eprofile or ematrix
 void reload_defaults(dt_iop_module_t *self)
@@ -1795,102 +1629,10 @@ void reload_defaults(dt_iop_module_t *self)
   // change.
 
   // We need gui_data to access widget in order to change tooltip.
-  dt_iop_colorin_gui_data_t *g = self->gui_data;
 
   // reload_defaults() can be called with unavailable (i.e., NULL) gui_data.
   // In this case, we have nothing to do with tooltips.
 
-  if(g)
-  {
-    gboolean profile_embedded_but_corrupted = FALSE;
-
-    char *tooltip_part_profile_dirs =
-      dt_ioppr_get_location_tooltip("in", _("external ICC profiles"));
-
-    // In case of embedded ICC profile we will modify tooltip with the
-    // profile info, otherwise reset tooltip to generic text.
-    if(color_profile == DT_COLORSPACE_EMBEDDED_ICC)
-    {
-      cmsHPROFILE cmsprofile = cmsOpenProfileFromMem(img->profile, img->profile_size);
-
-      // So, exiv2 read the embedded ICC profile from the image file, but it
-      // can be corrupted to the point that lcms2 cannot open it as a profile.
-      // In such a case, we have to bail out of the profile reading code, as
-      // we cannot read the profile properties and change the tooltip.
-      if(!cmsprofile)
-      {
-        profile_embedded_but_corrupted = TRUE;
-        dt_print(DT_DEBUG_ALWAYS, "[colorin] ICC profile is embedded but corrupted");
-        goto corrupted_profile;
-      }
-
-      char iccDesc[64]; iccDesc[0] = '\0';
-      cmsGetProfileInfoASCII(cmsprofile, cmsInfoDescription, "en", "US", iccDesc, 64);
-      char iccManuf[64]; iccManuf[0] = '\0';
-      cmsGetProfileInfoASCII(cmsprofile, cmsInfoManufacturer, "en", "US", iccManuf, 64);
-      char iccModel[64]; iccModel[0] = '\0';
-      cmsGetProfileInfoASCII(cmsprofile, cmsInfoModel, "en", "US", iccModel, 64);
-
-      // This is the only profile field in which, although it usually
-      // contains a short copyright text, in theory profile creators can
-      // put as long text as they want. So, we can't take a fast
-      // approach of statically allocating memory of some sufficient
-      // size and have to find out the size of the field at run-time and
-      // dynamically allocate memory.
-      char* iccCopyr;
-      const guint32 bufsize = cmsGetProfileInfoASCII(cmsprofile, cmsInfoCopyright,
-                                                     "en", "US", NULL, 0);
-      if(bufsize && (iccCopyr = malloc(bufsize+1)) != NULL)
-      {
-        cmsGetProfileInfoASCII(cmsprofile, cmsInfoCopyright,
-                               "en", "US", iccCopyr, bufsize);
-      }
-      else
-      {
-        iccCopyr = "";
-      }
-
-      const guint8 iccMajorVersion = cmsGetEncodedICCversion(cmsprofile) >> 24;
-      const guint8 iccMinorVersion = (cmsGetEncodedICCversion(cmsprofile) << 8) >> 28;
-
-      char *iccType = "";
-
-      if(cmsIsMatrixShaper(cmsprofile))
-        iccType = "Matrix";
-      else if(cmsIsCLUT(cmsprofile, INTENT_PERCEPTUAL, LCMS_USED_AS_INPUT))
-        iccType = "LUT";
-
-      char *tooltip = g_markup_printf_escaped(_("embedded ICC profile properties:\n\n"
-                                                "name: <b>%s</b>\n"
-                                                "version: <b>%d.%d</b>\n"
-                                                "type: <b>%s</b>\n"
-                                                "manufacturer: <b>%s</b>\n"
-                                                "model: <b>%s</b>\n"
-                                                "copyright: <b>%s</b>\n\n"),
-                                              iccDesc,
-                                              iccMajorVersion, iccMinorVersion,
-                                              iccType,
-                                              iccManuf,
-                                              iccModel,
-                                              iccCopyr);
-      char *tooltip2 = g_strconcat(tooltip, tooltip_part_profile_dirs, NULL);
-      gtk_widget_set_tooltip_markup(g->profile_combobox, tooltip2);
-      g_free(tooltip);
-      g_free(tooltip2);
-      g_free(tooltip_part_profile_dirs);
-      if(bufsize)
-        free(iccCopyr);
-    }
-
-    // Make a generic tooltip if there is no ICC profile in the current image,
-    // or we jumped here because profile is corrupted.
-corrupted_profile:
-    if((color_profile != DT_COLORSPACE_EMBEDDED_ICC) || profile_embedded_but_corrupted)
-    {
-      gtk_widget_set_tooltip_markup(g->profile_combobox, tooltip_part_profile_dirs);
-      g_free(tooltip_part_profile_dirs);
-    }
-  }
 
   if(color_profile != DT_COLORSPACE_NONE)
     d->type = color_profile;
@@ -1915,176 +1657,8 @@ corrupted_profile:
     d->type = DT_COLORSPACE_SRGB;
 
   dt_image_cache_write_release(img, DT_IMAGE_CACHE_RELAXED);
-
-  update_profile_list(self);
 }
 
-static void update_profile_list(dt_iop_module_t *self)
-{
-  dt_iop_colorin_gui_data_t *g = self->gui_data;
-
-  if(!g) return;
-
-  // clear and refill the image profile list
-  g_list_free_full(g->image_profiles, free);
-  g->image_profiles = NULL;
-  g->n_image_profiles = 0;
-
-  int pos = -1;
-  // some file formats like jpeg can have an embedded color profile
-  // currently we only support jpeg, j2k, tiff and png
-  const dt_image_t *cimg = dt_image_cache_get(self->dev->image_storage.id, 'r');
-  if(cimg && cimg->profile)
-  {
-    dt_colorspaces_color_profile_t *prof = calloc(1, sizeof(dt_colorspaces_color_profile_t));
-    g_strlcpy(prof->name, dt_colorspaces_get_name(DT_COLORSPACE_EMBEDDED_ICC, ""),
-              sizeof(prof->name));
-    prof->type = DT_COLORSPACE_EMBEDDED_ICC;
-    g->image_profiles = g_list_append(g->image_profiles, prof);
-    prof->in_pos = ++pos;
-  }
-  dt_image_cache_read_release(cimg);
-  // use the matrix embedded in some DNGs and EXRs
-  if(dt_is_valid_colormatrix(self->dev->image_storage.d65_color_matrix[0]))
-  {
-    dt_colorspaces_color_profile_t *prof = calloc(1, sizeof(dt_colorspaces_color_profile_t));
-    g_strlcpy(prof->name, dt_colorspaces_get_name(DT_COLORSPACE_EMBEDDED_MATRIX, ""),
-              sizeof(prof->name));
-    prof->type = DT_COLORSPACE_EMBEDDED_MATRIX;
-    g->image_profiles = g_list_append(g->image_profiles, prof);
-    prof->in_pos = ++pos;
-  }
-
-  if(dt_is_valid_colormatrix(self->dev->image_storage.adobe_XYZ_to_CAM[0][0])
-     && !(self->dev->image_storage.flags & DT_IMAGE_4BAYER))
-  {
-    dt_colorspaces_color_profile_t *prof = calloc(1, sizeof(dt_colorspaces_color_profile_t));
-    g_strlcpy(prof->name, dt_colorspaces_get_name(DT_COLORSPACE_STANDARD_MATRIX, ""),
-              sizeof(prof->name));
-    prof->type = DT_COLORSPACE_STANDARD_MATRIX;
-    g->image_profiles = g_list_append(g->image_profiles, prof);
-    prof->in_pos = ++pos;
-  }
-
-  // darktable built-in, if applicable
-  for(int k = 0; k < dt_profiled_colormatrix_cnt; k++)
-  {
-    if(!strcasecmp(self->dev->image_storage.camera_makermodel,
-                   dt_profiled_colormatrices[k].makermodel))
-    {
-      dt_colorspaces_color_profile_t *prof = calloc(1, sizeof(dt_colorspaces_color_profile_t));
-      g_strlcpy(prof->name, dt_colorspaces_get_name(DT_COLORSPACE_ENHANCED_MATRIX, ""),
-                sizeof(prof->name));
-      prof->type = DT_COLORSPACE_ENHANCED_MATRIX;
-      g->image_profiles = g_list_append(g->image_profiles, prof);
-      prof->in_pos = ++pos;
-      break;
-    }
-  }
-
-  // darktable vendor matrix, if applicable
-  for(int k = 0; k < dt_vendor_colormatrix_cnt; k++)
-  {
-    if(!strcmp(self->dev->image_storage.camera_makermodel,
-               dt_vendor_colormatrices[k].makermodel))
-    {
-      dt_colorspaces_color_profile_t *prof = calloc(1, sizeof(dt_colorspaces_color_profile_t));
-      g_strlcpy(prof->name, dt_colorspaces_get_name(DT_COLORSPACE_VENDOR_MATRIX, ""),
-                sizeof(prof->name));
-      prof->type = DT_COLORSPACE_VENDOR_MATRIX;
-      g->image_profiles = g_list_append(g->image_profiles, prof);
-      prof->in_pos = ++pos;
-      break;
-    }
-  }
-
-  // darktable alternate matrix, if applicable
-  for(int k = 0; k < dt_alternate_colormatrix_cnt; k++)
-  {
-    if(!strcmp(self->dev->image_storage.camera_makermodel,
-               dt_alternate_colormatrices[k].makermodel))
-    {
-      dt_colorspaces_color_profile_t *prof = calloc(1, sizeof(dt_colorspaces_color_profile_t));
-      g_strlcpy(prof->name, dt_colorspaces_get_name(DT_COLORSPACE_ALTERNATE_MATRIX, ""),
-                sizeof(prof->name));
-      prof->type = DT_COLORSPACE_ALTERNATE_MATRIX;
-      g->image_profiles = g_list_append(g->image_profiles, prof);
-      prof->in_pos = ++pos;
-      break;
-    }
-  }
-
-  g->n_image_profiles = pos + 1;
-
-  // update the gui
-  dt_bauhaus_combobox_clear(g->profile_combobox);
-
-  for(GList *l = g->image_profiles; l; l = g_list_next(l))
-  {
-    dt_colorspaces_color_profile_t *prof = l->data;
-    dt_bauhaus_combobox_add(g->profile_combobox, prof->name);
-  }
-  for(GList *l = darktable.color_profiles->profiles; l; l = g_list_next(l))
-  {
-    dt_colorspaces_color_profile_t *prof = l->data;
-    if(prof->in_pos > -1) dt_bauhaus_combobox_add(g->profile_combobox, prof->name);
-  }
-
-  // working profile
-  dt_bauhaus_combobox_clear(g->work_combobox);
-
-  for(GList *l = darktable.color_profiles->profiles; l; l = g_list_next(l))
-  {
-    dt_colorspaces_color_profile_t *prof = l->data;
-    if(prof->work_pos > -1) dt_bauhaus_combobox_add(g->work_combobox, prof->name);
-  }
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  // pthread_mutex_lock(&darktable.plugin_threadsafe);
-  dt_iop_colorin_gui_data_t *g = IOP_GUI_ALLOC(colorin);
-
-  g->image_profiles = NULL;
-
-  g->profile_combobox = dt_bauhaus_combobox_new(self);
-  dt_bauhaus_widget_set_label(g->profile_combobox, NULL, N_("input profile"));
-
-  g->work_combobox = dt_bauhaus_combobox_new(self);
-  dt_bauhaus_widget_set_label(g->work_combobox, NULL, N_("working profile"));
-
-  self->widget = dt_gui_vbox(g->profile_combobox, g->work_combobox);
-
-  dt_bauhaus_combobox_set(g->profile_combobox, 0);
-  // We do not set the tooltip for the input profile widget because
-  // this tooltip will always be overwritten in reload_defaults().
-
-  dt_bauhaus_combobox_set(g->work_combobox, 0);
-  {
-    char *tooltip = dt_ioppr_get_location_tooltip("out", _("working ICC profiles"));
-    gtk_widget_set_tooltip_markup(g->work_combobox, tooltip);
-    g_free(tooltip);
-  }
-
-  g_signal_connect(G_OBJECT(g->profile_combobox), "value-changed",
-                   G_CALLBACK(_profile_changed), (gpointer)self);
-  g_signal_connect(G_OBJECT(g->work_combobox), "value-changed",
-                   G_CALLBACK(_workicc_changed), (gpointer)self);
-
-  g->clipping_combobox = dt_bauhaus_combobox_from_params(self, "normalize");
-  gtk_widget_set_tooltip_text(g->clipping_combobox,
-                              _("confine Lab values to gamut of RGB color space"));
-}
-
-void gui_cleanup(dt_iop_module_t *self)
-{
-  dt_iop_colorin_gui_data_t *g = self->gui_data;
-  while(g->image_profiles)
-  {
-    g_free(g->image_profiles->data);
-    g->image_profiles = g_list_delete_link(g->image_profiles, g->image_profiles);
-  }
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

@@ -16,19 +16,14 @@
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "bauhaus/bauhaus.h"
 #include "common/custom_primaries.h"
 #include "common/math.h"
 #include "common/matrices.h"
 #include "common/dttypes.h"
 #include "develop/imageop.h"
-#include "develop/imageop_gui.h"
 #include "develop/openmp_maths.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "iop/iop_api.h"
 
-#include <gtk/gtk.h>
 #include <stdlib.h>
 
 DT_MODULE_INTROSPECTION(3, dt_iop_sigmoid_params_t)
@@ -173,12 +168,6 @@ typedef struct dt_iop_sigmoid_data_t
   dt_iop_sigmoid_base_primaries_t base_primaries;
 } dt_iop_sigmoid_data_t;
 
-typedef struct dt_iop_sigmoid_gui_data_t
-{
-  GtkWidget *color_processing_list, *hue_preservation_slider;
-
-  dt_gui_collapsible_section_t display_luminance_section, primaries_section;
-} dt_iop_sigmoid_gui_data_t;
 
 typedef struct dt_iop_sigmoid_global_data_t
 {
@@ -868,119 +857,6 @@ void cleanup_global(dt_iop_module_so_t *self)
 void init_pipe(dt_iop_module_t *self, dt_dev_pixelpipe_t *pipe, dt_dev_pixelpipe_iop_t *piece)
 {
   piece->data = calloc(1, sizeof(dt_iop_sigmoid_data_t));
-}
-
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  const dt_iop_sigmoid_gui_data_t *g = self->gui_data;
-  const dt_iop_sigmoid_params_t *p = self->params;
-
-  if(!w || w == g->color_processing_list)
-  {
-    const gboolean is_per_channel = p->color_processing == DT_SIGMOID_METHOD_PER_CHANNEL;
-    gtk_widget_set_visible(g->hue_preservation_slider, is_per_channel);
-    gtk_widget_set_visible(g->primaries_section.expander, is_per_channel);
-  }
-}
-
-void gui_update(dt_iop_module_t *self)
-{
-  const dt_iop_sigmoid_gui_data_t *g = self->gui_data;
-
-  dt_gui_update_collapsible_section(&g->display_luminance_section);
-  dt_gui_update_collapsible_section(&g->primaries_section);
-
-  gui_changed(self, NULL, NULL);
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_sigmoid_gui_data_t *g = IOP_GUI_ALLOC(sigmoid);
-
-  // Look controls
-  GtkWidget *slider = dt_bauhaus_slider_from_params(self, "middle_grey_contrast");
-  dt_bauhaus_slider_set_soft_range(slider, 0.7f, 3.0f);
-  dt_bauhaus_slider_set_digits(slider, 3);
-  gtk_widget_set_tooltip_text(slider, _("compression of the applied curve\n"
-                                        "implicitly defines the supported input dynamic range"));
-  slider = dt_bauhaus_slider_from_params(self, "contrast_skewness");
-  gtk_widget_set_tooltip_text(slider, _("shift the compression towards shadows or highlights.\n"
-                                        "negative values increase contrast in shadows.\n"
-                                        "positive values increase contrast in highlights.\n"
-                                        "the opposite end will see a reduction in contrast."));
-
-  // Color handling
-  g->color_processing_list = dt_bauhaus_combobox_from_params(self, "color_processing");
-  g->hue_preservation_slider = dt_bauhaus_slider_from_params(self, "hue_preservation");
-  dt_bauhaus_slider_set_format(g->hue_preservation_slider, "%");
-  gtk_widget_set_tooltip_text(g->hue_preservation_slider, _("optional correction of the hue twist introduced by\n"
-                                                            "the per-channel processing method."));
-
-  GtkWidget *main_box = self->widget;
-
-  // primaries collapsible section
-  dt_gui_new_collapsible_section(&g->primaries_section, "plugins/darkroom/sigmoid/expand_primaries",
-                                 _("primaries"), GTK_BOX(main_box), DT_ACTION(self));
-  gtk_widget_set_tooltip_text(g->primaries_section.expander, _("set custom primaries"));
-
-  self->widget = GTK_WIDGET(g->primaries_section.container);
-  dt_iop_module_t *sect = DT_IOP_SECTION_FOR_PARAMS(self, N_("primaries"));
-
-  GtkWidget *base_primaries = dt_bauhaus_combobox_from_params(self, "base_primaries");
-  gtk_widget_set_tooltip_text(base_primaries, _("primaries to use as the base for below adjustments\n"
-                                                "'working profile' uses the profile set in 'input color profile'"));
-
-#define SETUP_COLOR_COMBO(color, r, g, b, inset_tooltip, rotation_tooltip)                                        \
-  slider = dt_bauhaus_slider_from_params(sect, #color "_inset");                                                  \
-  dt_bauhaus_slider_set_format(slider, "%");                                                                      \
-  dt_bauhaus_slider_set_digits(slider, 1);                                                                        \
-  dt_bauhaus_slider_set_factor(slider, 100.f);                                                                    \
-  dt_bauhaus_slider_set_soft_range(slider, 0.f, 0.5f);                                                            \
-  dt_bauhaus_slider_set_stop(slider, 0.f, r, g, b);                                                               \
-  gtk_widget_set_tooltip_text(slider, inset_tooltip);                                                             \
-                                                                                                                  \
-  slider = dt_bauhaus_slider_from_params(sect, #color "_rotation");                                               \
-  dt_bauhaus_slider_set_format(slider, "°");                                                                      \
-  dt_bauhaus_slider_set_digits(slider, 1);                                                                        \
-  dt_bauhaus_slider_set_factor(slider, RAD_2_DEG);                                                                \
-  dt_bauhaus_slider_set_stop(slider, 0.f, r, g, b);                                                               \
-  gtk_widget_set_tooltip_text(slider, rotation_tooltip);
-
-  const float desaturation = 0.2f;
-  SETUP_COLOR_COMBO(red, 1.f - desaturation, desaturation, desaturation, _("attenuate the purity of the red primary"),
-                    _("rotate the red primary"));
-  SETUP_COLOR_COMBO(green, desaturation, 1.f - desaturation, desaturation, _("attenuate the purity of the green primary"),
-                    _("rotate the green primary"));
-  SETUP_COLOR_COMBO(blue, desaturation, desaturation, 1.f - desaturation, _("attenuate the purity of the blue primary"),
-                    _("rotate the blue primary"));
-#undef SETUP_COLOR_COMBO
-
-  slider = dt_bauhaus_slider_from_params(sect, "purity");
-  dt_bauhaus_slider_set_format(slider, "%");
-  dt_bauhaus_slider_set_digits(slider, 0);
-  dt_bauhaus_slider_set_factor(slider, 100.f);
-  gtk_widget_set_tooltip_text(slider, _("recover some of the original purity after the inset"));
-
-  // display luminance section
-  dt_gui_new_collapsible_section(&g->display_luminance_section, "plugins/darkroom/sigmoid/expand_values",
-                                 _("display luminance"), GTK_BOX(main_box), DT_ACTION(self));
-  gtk_widget_set_tooltip_text(g->display_luminance_section.expander, _("set display black/white targets"));
-
-  self->widget = GTK_WIDGET(g->display_luminance_section.container);
-
-  slider = dt_bauhaus_slider_from_params(self, "display_black_target");
-  dt_bauhaus_slider_set_soft_range(slider, 0.0f, 1.0f);
-  dt_bauhaus_slider_set_digits(slider, 4);
-  dt_bauhaus_slider_set_format(slider, "%");
-  gtk_widget_set_tooltip_text(slider, _("the black luminance of the target display or print.\n"
-                                        "can be used creatively for a faded look."));
-  slider = dt_bauhaus_slider_from_params(self, "display_white_target");
-  dt_bauhaus_slider_set_soft_range(slider, 50.0f, 100.0f);
-  dt_bauhaus_slider_set_format(slider, "%");
-  gtk_widget_set_tooltip_text(slider, _("the white luminance of the target display or print.\n"
-                                        "can be used creatively for a faded look or blowing out whites earlier."));
-
-  self->widget = main_box;
 }
 
 

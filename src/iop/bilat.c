@@ -17,7 +17,6 @@
 */
 
 // our includes go first:
-#include "bauhaus/bauhaus.h"
 #include "common/bilateral.h"
 #include "common/bilateralcl.h"
 #include "common/imagebuf.h"
@@ -25,15 +24,10 @@
 #include "common/locallaplaciancl.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "develop/tiling.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "iop/iop_api.h"
 
-#include <gtk/gtk.h>
 #include <stdlib.h>
-#include "gui/accelerators.h"
 
 // this is the version of the modules parameters,
 // and includes version information about compile-time dt
@@ -57,16 +51,6 @@ typedef struct dt_iop_bilat_params_t
 
 typedef dt_iop_bilat_params_t dt_iop_bilat_data_t;
 
-typedef struct dt_iop_bilat_gui_data_t
-{
-  GtkWidget *highlights;
-  GtkWidget *shadows;
-  GtkWidget *midtone;
-  GtkWidget *spatial;
-  GtkWidget *range;
-  GtkWidget *detail;
-  GtkWidget *mode;
-} dt_iop_bilat_gui_data_t;
 
 // this returns a translatable name
 const char *name()
@@ -369,135 +353,6 @@ void process(dt_iop_module_t *self,
   }
 }
 
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  dt_iop_bilat_gui_data_t *g = self->gui_data;
-  dt_iop_bilat_params_t *p = self->params;
-  if(w == g->highlights || w == g->shadows || w == g->midtone)
-  {
-    dt_bauhaus_combobox_set(g->mode, s_mode_local_laplacian);
-  }
-  else if(w == g->range || w == g->spatial)
-  {
-    dt_bauhaus_combobox_set(g->mode, s_mode_bilateral);
-  }
-  else if(w == g->mode)
-  {
-    if(p->mode == s_mode_local_laplacian)
-    {
-      p->sigma_r = dt_bauhaus_slider_get(g->highlights);
-      p->sigma_s = dt_bauhaus_slider_get(g->shadows);
-    }
-    else
-    {
-      p->sigma_r = dt_bauhaus_slider_get(g->range);
-      p->sigma_s = dt_bauhaus_slider_get(g->spatial);
-    }
-  }
-
-  if(!w || w == g->mode)
-  {
-    gtk_widget_set_visible(g->highlights, p->mode == s_mode_local_laplacian);
-    gtk_widget_set_visible(g->shadows, p->mode == s_mode_local_laplacian);
-    gtk_widget_set_visible(g->midtone, p->mode == s_mode_local_laplacian);
-    gtk_widget_set_visible(g->range, p->mode != s_mode_local_laplacian);
-    gtk_widget_set_visible(g->spatial, p->mode != s_mode_local_laplacian);
-  }
-}
-
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_bilat_gui_data_t *g = self->gui_data;
-  dt_iop_bilat_params_t *p = self->params;
-
-  if(p->mode == s_mode_local_laplacian)
-  {
-    dt_bauhaus_slider_set(g->highlights, p->sigma_r);
-    dt_bauhaus_slider_set(g->shadows, p->sigma_s);
-    dt_bauhaus_slider_set(g->midtone, p->midtone);
-    dt_bauhaus_slider_set(g->range, 20.0f);
-    dt_bauhaus_slider_set(g->spatial, 50.0f);
-  }
-  else
-  {
-    dt_bauhaus_slider_set(g->range, p->sigma_r);
-    dt_bauhaus_slider_set(g->spatial, p->sigma_s);
-    dt_bauhaus_slider_set(g->midtone, p->midtone);
-    dt_bauhaus_slider_set(g->highlights, 0.5f);
-    dt_bauhaus_slider_set(g->shadows, 0.5f);
-  }
-
-  gui_changed(self, NULL, NULL);
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  // init the slider (more sophisticated layouts are possible with gtk tables and boxes):
-  dt_iop_bilat_gui_data_t *g = IOP_GUI_ALLOC(bilat);
-
-  g->mode = dt_bauhaus_combobox_from_params(self, N_("mode"));
-  gtk_widget_set_tooltip_text
-    (g->mode,
-     _("the filter used for local contrast enhancement."
-       " bilateral is faster but can lead to artifacts around"
-       " edges for extreme settings."));
-
-  g->detail = dt_bauhaus_slider_from_params(self, N_("detail"));
-  dt_bauhaus_slider_set_offset(g->detail, 100);
-  dt_bauhaus_slider_set_format(g->detail, "%");
-  gtk_widget_set_tooltip_text(g->detail, _("changes the local contrast"));
-
-  ++darktable.bauhaus->skip_accel;
-  g->spatial = dt_bauhaus_slider_from_params(self, "sigma_s");
-  g->range = dt_bauhaus_slider_from_params(self, "sigma_r");
-  g->highlights = dt_bauhaus_slider_from_params(self, "sigma_r");
-  g->shadows = dt_bauhaus_slider_from_params(self, "sigma_s");
-  --darktable.bauhaus->skip_accel;
-
-  dt_bauhaus_slider_set_hard_min(g->spatial, 3.0);
-  dt_bauhaus_slider_set_default(g->spatial, 50.0);
-  dt_bauhaus_slider_set_digits(g->spatial, 0);
-  dt_bauhaus_widget_set_label(g->spatial, NULL, N_("coarseness"));
-  gtk_widget_set_tooltip_text
-    (g->spatial,
-     _("feature size of local details (spatial sigma of bilateral filter)"));
-
-  dt_bauhaus_slider_set_hard_min(g->range, 1.0);
-  dt_bauhaus_slider_set_default(g->range, 20.0);
-  dt_bauhaus_slider_set_digits(g->range, 0);
-  dt_bauhaus_widget_set_label(g->range, NULL, N_("contrast"));
-  gtk_widget_set_tooltip_text
-    (g->range,
-     _("L difference to detect edges (range sigma of bilateral filter)"));
-
-  dt_bauhaus_widget_set_label(g->highlights, NULL, N_("highlights"));
-  dt_bauhaus_slider_set_hard_max(g->highlights, 2.0);
-  dt_bauhaus_slider_set_format(g->highlights, "%");
-  gtk_widget_set_tooltip_text(g->highlights,
-                              _("changes the local contrast of highlights"));
-
-  dt_bauhaus_widget_set_label(g->shadows, NULL, N_("shadows"));
-  dt_bauhaus_slider_set_hard_max(g->shadows, 2.0);
-  dt_bauhaus_slider_set_format(g->shadows, "%");
-  gtk_widget_set_tooltip_text(g->shadows,
-                              _("changes the local contrast of shadows"));
-
-  g->midtone = dt_bauhaus_slider_from_params(self, "midtone");
-  dt_bauhaus_slider_set_digits(g->midtone, 3);
-  gtk_widget_set_tooltip_text
-    (g->midtone,
-     _("defines what counts as mid-tones. lower for better dynamic range compression"
-       " (reduce shadow and highlight contrast),"
-       " increase for more powerful local contrast"));
-
-  // work around multi-instance issue which calls show all a fair bit:
-  g_object_set(G_OBJECT(g->highlights), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->shadows), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->midtone), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->range), "no-show-all", TRUE, NULL);
-  g_object_set(G_OBJECT(g->spatial), "no-show-all", TRUE, NULL);
-
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

@@ -20,7 +20,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bauhaus/bauhaus.h"
 #include "common/colorspaces.h"
 #include "common/debug.h"
 #include "common/math.h"
@@ -29,13 +28,7 @@
 #include "develop/develop.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "develop/tiling.h"
-#include "dtgtk/gradientslider.h"
-#include "gui/accelerators.h"
-#include "gui/color_picker_proxy.h"
-#include "gui/gtk.h"
-#include "gui/presets.h"
 #include "iop/iop_api.h"
 
 DT_MODULE_INTROSPECTION(1, dt_iop_graduatednd_params_t)
@@ -110,16 +103,6 @@ void init_presets(dt_iop_module_so_t *self)
   dt_database_release_transaction(darktable.db);
 }
 
-typedef struct dt_iop_graduatednd_gui_data_t
-{
-  GtkWidget *density, *hardness, *rotation, *hue, *saturation;
-
-  int selected;
-  int dragging;
-
-  gboolean define;
-  float xa, ya, xb, yb, oldx, oldy;
-} dt_iop_graduatednd_gui_data_t;
 
 typedef struct dt_iop_graduatednd_data_t
 {
@@ -176,32 +159,6 @@ typedef struct dt_iop_vector_2d_t
 } dt_iop_vector_2d_t;
 
 // determine the distance between the segment [(xa,ya)(xb,yb)] and the point (xc,yc)
-static float _dist_seg(
-  	const float xa,
-        const float ya,
-        const float xb,
-        const float yb,
-        const float xc,
-        const float yc)
-{
-  if(xa == xb && ya == yb) return (xc - xa) * (xc - xa) + (yc - ya) * (yc - ya);
-
-  const float sx = xb - xa;
-  const float sy = yb - ya;
-
-  const float ux = xc - xa;
-  const float uy = yc - ya;
-
-  const float dp = sx * ux + sy * uy;
-  if(dp < 0) return (xc - xa) * (xc - xa) + (yc - ya) * (yc - ya);
-
-  const float sn2 = sx * sx + sy * sy;
-  if(dp > sn2) return (xc - xb) * (xc - xb) + (yc - yb) * (yc - yb);
-
-  const float ah2 = dp * dp / sn2;
-  const float un2 = ux * ux + uy * uy;
-  return un2 - ah2;
-}
 
 static int _set_grad_from_points(
 	dt_iop_module_t *self,
@@ -444,195 +401,6 @@ static int _set_points_from_grad(
   return 1;
 }
 
-static inline void _update_saturation_slider_end_color(GtkWidget *slider, const float hue)
-{
-  dt_aligned_pixel_t rgb;
-  hsl2rgb(rgb, hue, 1.0, 0.5);
-  dt_bauhaus_slider_set_stop(slider, 1.0, rgb[0], rgb[1], rgb[2]);
-}
-
-void color_picker_apply(dt_iop_module_t *self, GtkWidget *picker,
-                        dt_dev_pixelpipe_t *pipe)
-{
-  const dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  dt_iop_graduatednd_params_t *p = self->params;
-
-  // convert picker RGB 2 HSL
-  float H = .0f, S = .0f, L = .0f;
-  rgb2hsl(self->picked_color, &H, &S, &L);
-
-  if(fabsf(p->hue - H) < 0.0001f && fabsf(p->saturation - S) < 0.0001f)
-  {
-    // interrupt infinite loops
-    return;
-  }
-
-  p->hue        = H;
-  p->saturation = S;
-
-  ++darktable.gui->reset;
-  dt_bauhaus_slider_set(g->hue, p->hue);
-  dt_bauhaus_slider_set(g->saturation, p->saturation);
-  _update_saturation_slider_end_color(g->saturation, p->hue);
-  --darktable.gui->reset;
-
-  dt_dev_add_history_item(darktable.develop, self, TRUE);
-}
-
-void gui_reset(dt_iop_module_t *self)
-{
-  dt_iop_color_picker_reset(self, TRUE);
-}
-
-void gui_post_expose(dt_iop_module_t *self,
-                     cairo_t *cr,
-                     const float wd,
-                     const float ht,
-                     const float pointerx,
-                     const float pointery,
-                     const float zoom_scale)
-{
-  dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  const dt_iop_graduatednd_params_t *p = self->params;
-
-  // we get the extremities of the line
-  if(g->define == 0)
-  {
-    if(!_set_points_from_grad(self, &g->xa, &g->ya, &g->xb, &g->yb, p->rotation, p->offset)) return;
-    g->define = 1;
-  }
-
-  const float xa = g->xa * wd, xb = g->xb * wd, ya = g->ya * ht, yb = g->yb * ht;
-  // the lines
-  const double lwidth = (dt_iop_canvas_not_sensitive(darktable.develop) ? 0.5 : 1.0) / zoom_scale;
-  cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
-  if(g->selected == 3 || g->dragging == 3)
-    cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(5.0) * lwidth);
-  else
-    cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(3.0) * lwidth);
-  dt_draw_set_color_overlay(cr, FALSE, 0.8);
-
-  cairo_move_to(cr, xa, ya);
-  cairo_line_to(cr, xb, yb);
-  cairo_stroke(cr);
-
-  if(g->selected == 3 || g->dragging == 3)
-    cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(2.0) * lwidth);
-  else
-    cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(1.0) * lwidth);
-  dt_draw_set_color_overlay(cr, TRUE, 0.8);
-  cairo_move_to(cr, xa, ya);
-  cairo_line_to(cr, xb, yb);
-  cairo_stroke(cr);
-
-  if(dt_iop_canvas_not_sensitive(darktable.develop))
-    return;
-  // the extremities
-  float x1, y1, x2, y2;
-  const float l = sqrtf((xb - xa) * (xb - xa) + (yb - ya) * (yb - ya));
-  const float ext = wd * 0.01f / zoom_scale;
-  x1 = xa + (xb - xa) * ext / l;
-  y1 = ya + (yb - ya) * ext / l;
-  x2 = (xa + x1) / 2.0;
-  y2 = (ya + y1) / 2.0;
-  y2 += (x1 - xa);
-  x2 -= (y1 - ya);
-  cairo_move_to(cr, xa, ya);
-  cairo_line_to(cr, x1, y1);
-  cairo_line_to(cr, x2, y2);
-  cairo_close_path(cr);
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(1.0) * lwidth);
-  if(g->selected == 1 || g->dragging == 1)
-    dt_draw_set_color_overlay(cr, TRUE, 1.0);
-  else
-    dt_draw_set_color_overlay(cr, TRUE, 0.5);
-  cairo_fill_preserve(cr);
-  if(g->selected == 1 || g->dragging == 1)
-    dt_draw_set_color_overlay(cr, FALSE, 1.0);
-  else
-    dt_draw_set_color_overlay(cr, FALSE, 0.5);
-  cairo_stroke(cr);
-
-  x1 = xb - (xb - xa) * ext / l;
-  y1 = yb - (yb - ya) * ext / l;
-  x2 = (xb + x1) / 2.0;
-  y2 = (yb + y1) / 2.0;
-  y2 += (xb - x1);
-  x2 -= (yb - y1);
-  cairo_move_to(cr, xb, yb);
-  cairo_line_to(cr, x1, y1);
-  cairo_line_to(cr, x2, y2);
-  cairo_close_path(cr);
-  cairo_set_line_width(cr, DT_PIXEL_APPLY_DPI(1.0) * lwidth);
-  if(g->selected == 2 || g->dragging == 2)
-    dt_draw_set_color_overlay(cr, TRUE, 1.0);
-  else
-    dt_draw_set_color_overlay(cr, TRUE, 0.5);
-  cairo_fill_preserve(cr);
-  if(g->selected == 2 || g->dragging == 2)
-    dt_draw_set_color_overlay(cr, FALSE, 1.0);
-  else
-    dt_draw_set_color_overlay(cr, FALSE, 0.5);
-  cairo_stroke(cr);
-}
-
-int mouse_moved(dt_iop_module_t *self,
-                const float pzx,
-                const float pzy,
-                const double pressure,
-                const int which,
-                const float zoom_scale)
-{
-  dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  gboolean handled = FALSE;
-
-  // are we dragging something ?
-  if(g->dragging > 0)
-  {
-    if(g->dragging == 1)
-    {
-      // we are dragging xa,ya
-      g->xa = pzx;
-      g->ya = pzy;
-    }
-    else if(g->dragging == 2)
-    {
-      // we are dragging xb,yb
-      g->xb = pzx;
-      g->yb = pzy;
-    }
-    else if(g->dragging == 3)
-    {
-      // we are dragging the entire line
-      g->xa += pzx - g->oldx;
-      g->xb += pzx - g->oldx;
-      g->ya += pzy - g->oldy;
-      g->yb += pzy - g->oldy;
-      g->oldx = pzx;
-      g->oldy = pzy;
-    }
-    handled = TRUE;
-  }
-  else
-  {
-    g->selected = 0;
-    const float ext = DT_PIXEL_APPLY_DPI(0.02f) / zoom_scale;
-    // are we near extremity ?
-    if(pzy > g->ya - ext && pzy < g->ya + ext && pzx > g->xa - ext && pzx < g->xa + ext)
-    {
-      g->selected = 1;
-    }
-    else if(pzy > g->yb - ext && pzy < g->yb + ext && pzx > g->xb - ext && pzx < g->xb + ext)
-    {
-      g->selected = 2;
-    }
-    else if(_dist_seg(g->xa, g->ya, g->xb, g->yb, pzx, pzy) < ext * ext * 0.5)
-      g->selected = 3;
-  }
-
-  dt_control_queue_redraw_center();
-  return handled;
-}
 
 int button_pressed(dt_iop_module_t *self,
                    const float pzx,
@@ -643,106 +411,19 @@ int button_pressed(dt_iop_module_t *self,
                    const uint32_t state,
                    const float zoom_scale)
 {
-  dt_iop_graduatednd_gui_data_t *g = self->gui_data;
 
   if(which == GDK_BUTTON_SECONDARY)
   {
     // creating a line with right click
-    g->dragging = 2;
-    g->xa = pzx;
-    g->ya = pzy;
-    g->xb = pzx;
-    g->yb = pzy;
-    g->oldx = pzx;
-    g->oldy = pzy;
     return 1;
   }
   else if(g->selected > 0 && which == GDK_BUTTON_PRIMARY)
   {
-    g->dragging = g->selected;
-    g->oldx = pzx;
-    g->oldy = pzy;
-    return 1;
-  }
-  g->dragging = 0;
-  return 0;
-}
-
-int button_released(dt_iop_module_t *self,
-                    const float pzx,
-                    const float pzy,
-                    const int which,
-                    const uint32_t state,
-                    const float zoom_scale)
-{
-  dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  dt_iop_graduatednd_params_t *p = self->params;
-  if(g->dragging > 0)
-  {
-    float r = 0.0, o = 0.0;
-    _set_grad_from_points(self, g->xa, g->ya, g->xb, g->yb, &r, &o);
-
-    // if this is a "line dragging, we reset extremities, to be sure they are not outside the image
-    if(g->dragging == 3)
-    {
-      /*
-       * whole line dragging should not change rotation, so we should reuse
-       * old rotation to avoid rounding issues
-       */
-
-      r = p->rotation;
-      _set_points_from_grad(self, &g->xa, &g->ya, &g->xb, &g->yb, r, o);
-    }
-    ++darktable.gui->reset;
-    dt_bauhaus_slider_set(g->rotation, r);
-    --darktable.gui->reset;
-    p->rotation = r;
-    p->offset = o;
-    g->dragging = 0;
-    dt_dev_add_history_item(darktable.develop, self, TRUE);
-  }
-
-  g->dragging = 0;
-  return 0;
-}
-
-int scrolled(
-	dt_iop_module_t *self,
-        float x,
-        float y,
-        int up,
-        uint32_t state)
-{
-  const dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  const dt_iop_graduatednd_params_t *p = self->params;
-  if(dt_modifier_is(state, GDK_CONTROL_MASK))
-  {
-    float dens;
-    if(up)
-      dens = fminf(8.0, p->density + 0.1);
-    else
-      dens = fmaxf(-8.0, p->density - 0.1);
-    if(dens != p->density)
-    {
-      dt_bauhaus_slider_set(g->density, dens);
-    }
-    return 1;
-  }
-  if(dt_modifier_is(state, GDK_SHIFT_MASK))
-  {
-    float comp;
-    if(up)
-      comp = fminf(100.0, p->hardness + 1.0);
-    else
-      comp = fmaxf(0.0, p->hardness - 1.0);
-    if(comp != p->hardness)
-    {
-      dt_bauhaus_slider_set(g->hardness, comp);
-    }
     return 1;
   }
   return 0;
 }
+
 
 DT_OMP_DECLARE_SIMD(simdlen(4))
 static inline float _density_times_length(const float dens, const float length)
@@ -994,20 +675,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  const dt_iop_graduatednd_params_t *p = self->params;
-  dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  if(w == g->rotation)
-  {
-    _set_points_from_grad(self, &g->xa, &g->ya, &g->xb, &g->yb, p->rotation, p->offset);
-  }
-  else if(w == g->hue)
-  {
-    _update_saturation_slider_end_color(g->saturation, p->hue);
-    gtk_widget_queue_draw(g->saturation);
-  }
-}
 
 void commit_params(dt_iop_module_t *self,
                    dt_iop_params_t *p1,
@@ -1046,58 +713,6 @@ void cleanup_pipe(dt_iop_module_t *self,
   piece->data = NULL;
 }
 
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_graduatednd_gui_data_t *g = self->gui_data;
-  const dt_iop_graduatednd_params_t *p = self->params;
-
-  dt_iop_color_picker_reset(self, TRUE);
-
-  g->define = 0;
-  _update_saturation_slider_end_color(g->saturation, p->hue);
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_graduatednd_gui_data_t *g = IOP_GUI_ALLOC(graduatednd);
-
-  g->density = dt_bauhaus_slider_from_params(self, "density");
-  dt_bauhaus_slider_set_format(g->density, _(" EV"));
-  gtk_widget_set_tooltip_text(g->density, _("the density in EV for the filter"));
-
-  g->hardness = dt_bauhaus_slider_from_params(self, "hardness");
-  dt_bauhaus_slider_set_format(g->hardness, "%");
-  /* xgettext:no-c-format */
-  gtk_widget_set_tooltip_text(g->hardness, _("hardness of graduation:\n0% = soft, 100% = hard"));
-
-  g->rotation = dt_bauhaus_slider_from_params(self, "rotation");
-  dt_bauhaus_slider_set_format(g->rotation, "°");
-  dt_bauhaus_slider_set_factor(g->rotation, -1.f);
-  gtk_widget_set_tooltip_text(g->rotation, _("rotation of filter -180 to 180 degrees"));
-
-  g->hue = dt_color_picker_new(self, DT_COLOR_PICKER_POINT, dt_bauhaus_slider_from_params(self, "hue"));
-  dt_bauhaus_slider_set_feedback(g->hue, 0);
-  dt_bauhaus_slider_set_factor(g->hue, 360.0f);
-  dt_bauhaus_slider_set_format(g->hue, "°");
-  dt_bauhaus_slider_set_stop(g->hue, 0.0f, 1.0f, 0.0f, 0.0f);
-  dt_bauhaus_slider_set_stop(g->hue, 0.166f, 1.0f, 1.0f, 0.0f);
-  dt_bauhaus_slider_set_stop(g->hue, 0.322f, 0.0f, 1.0f, 0.0f);
-  dt_bauhaus_slider_set_stop(g->hue, 0.498f, 0.0f, 1.0f, 1.0f);
-  dt_bauhaus_slider_set_stop(g->hue, 0.664f, 0.0f, 0.0f, 1.0f);
-  dt_bauhaus_slider_set_stop(g->hue, 0.830f, 1.0f, 0.0f, 1.0f);
-  dt_bauhaus_slider_set_stop(g->hue, 1.0f, 1.0f, 0.0f, 0.0f);
-  gtk_widget_set_tooltip_text(g->hue, _("select the hue tone of filter"));
-
-  g->saturation = dt_bauhaus_slider_from_params(self, "saturation");
-  dt_bauhaus_slider_set_format(g->saturation, "%");
-  dt_bauhaus_slider_set_stop(g->saturation, 0.0f, 0.2f, 0.2f, 0.2f);
-  dt_bauhaus_slider_set_stop(g->saturation, 1.0f, 1.0f, 1.0f, 1.0f);
-  gtk_widget_set_tooltip_text(g->saturation, _("select the saturation of filter"));
-
-  g->selected = 0;
-  g->dragging = 0;
-  g->define = 0;
-}
 
 GSList *mouse_actions(dt_iop_module_t *self)
 {

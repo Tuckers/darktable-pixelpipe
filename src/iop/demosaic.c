@@ -15,8 +15,12 @@
     You should have received a copy of the GNU General Public License
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
+/* NOTE: This file has been extracted from darktable for the pixelpipe
+ * extraction project. GUI-related code has been removed using
+ * scripts/strip_iop.py. Only image processing logic, parameter structs,
+ * and pipeline functions are retained.
+ */
 
-#include "bauhaus/bauhaus.h"
 #include "common/colorspaces.h"
 #include "common/darktable.h"
 #include "common/interpolation.h"
@@ -30,14 +34,11 @@
 #include "develop/develop.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "develop/imageop_gui.h"
 #include "develop/masks.h"
 #include "develop/blend.h"
 #include "common/colorspaces_inline_conversions.h"
 #include "imageio/imageio_rawspeed.h" // for dt_rawspeed_crop_dcraw_filters
 #include "develop/tiling.h"
-#include "gui/accelerators.h"
-#include "gui/gtk.h"
 #include "iop/iop_api.h"
 
 #include <complex.h>
@@ -161,32 +162,6 @@ typedef struct dt_iop_demosaic_params_t
   gboolean cs_enabled;                          // $DEFAULT: FALSE $DESCRIPTION: "capture sharpen"
 } dt_iop_demosaic_params_t;
 
-typedef struct dt_iop_demosaic_gui_data_t
-{
-  GtkWidget *median_thrs;
-  GtkWidget *greeneq;
-  GtkWidget *color_smoothing;
-  GtkWidget *demosaic_method_bayer;
-  GtkWidget *demosaic_method_xtrans;
-  GtkWidget *demosaic_method_bayerfour;
-  GtkWidget *demosaic_method_mono;
-  GtkWidget *dual_thrs;
-  GtkWidget *lmmse_refine;
-  GtkWidget *cs_thrs;
-  GtkWidget *cs_radius;
-  GtkWidget *cs_boost;
-  GtkWidget *cs_iter;
-  GtkWidget *cs_center;
-  GtkWidget *cs_enabled;
-  dt_gui_collapsible_section_t capture;
-  gboolean cs_mask;
-  gboolean dual_mask;
-  gboolean cs_boost_mask;
-  gboolean autoradius;
-  gboolean autothrs;
-  float new_radius;
-  float new_thrs;
-} dt_iop_demosaic_gui_data_t;
 
 typedef struct dt_iop_demosaic_global_data_t
 {
@@ -671,7 +646,6 @@ void process(dt_iop_module_t *self,
 
   const uint8_t(*const xtrans)[6] = xtrans_new;
   const dt_iop_demosaic_data_t *d = piece->data;
-  const dt_iop_demosaic_gui_data_t *g = self->gui_data;
   const uint32_t filters = dt_rawspeed_crop_dcraw_filters(pipe->dsc.filters, roi_in->x, roi_in->y);
 
   const gboolean fullscale = _demosaic_full(piece, img, roi_out);
@@ -946,7 +920,6 @@ int process_cl(dt_iop_module_t *self,
   dt_dev_clear_scharr_mask(pipe);
 
   const dt_iop_demosaic_data_t *d = piece->data;
-  const dt_iop_demosaic_gui_data_t *g = self->gui_data;
   const dt_iop_demosaic_global_data_t *gd = self->global_data;
 
   const int demosaicing_method = d->demosaicing_method;
@@ -1503,7 +1476,6 @@ void cleanup_pipe(dt_iop_module_t *self, dt_dev_pixelpipe_t *pipe, dt_dev_pixelp
 void reload_defaults(dt_iop_module_t *self)
 {
   dt_iop_demosaic_params_t *d = self->default_params;
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
   const dt_image_t *img = &self->dev->image_storage;
 
   if(dt_image_is_monochrome(img))
@@ -1521,353 +1493,9 @@ void reload_defaults(dt_iop_module_t *self)
 
   self->default_enabled = dt_image_is_raw(img) || dt_image_is_mono_sraw(img);
   if(self->widget)
-    gtk_stack_set_visible_child_name(GTK_STACK(self->widget), self->default_enabled ? "raw" : "non_raw");
 
-  if(g)
-  {
-    g->autoradius = FALSE;
-    g->autothrs = FALSE;
-  }
 }
 
-void gui_changed(dt_iop_module_t *self, GtkWidget *w, void *previous)
-{
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  dt_iop_demosaic_params_t *p = self->params;
-
-  const dt_image_t *oimg = &self->dev->image_storage;
-  const gboolean true_monochrome = dt_image_is_mono_sraw(oimg);
-  const gboolean bayer4 = oimg->flags & DT_IMAGE_4BAYER;
-  const gboolean bayer  = oimg->buf_dsc.filters != 9u && !bayer4 && !true_monochrome;
-  const gboolean xtrans = oimg->buf_dsc.filters == 9u;
-
-  dt_iop_demosaic_method_t use_method = p->demosaicing_method;
-  const gboolean xmethod = use_method & DT_DEMOSAIC_XTRANS;
-  const gboolean is_dual = use_method & DT_DEMOSAIC_DUAL;
-
-  if(bayer && xmethod)
-    use_method = is_dual ? DT_IOP_DEMOSAIC_RCD_DUAL : DT_IOP_DEMOSAIC_RCD;
-  if(xtrans && !xmethod)
-    use_method = is_dual ? DT_IOP_DEMOSAIC_MARKEST3_DUAL : DT_IOP_DEMOSAIC_MARKESTEIJN;
-  if(true_monochrome)
-    use_method = DT_IOP_DEMOSAIC_MONO;
-
-  const gboolean bayerpassing =
-      use_method == DT_IOP_DEMOSAIC_PASSTHROUGH_MONOCHROME
-   || use_method == DT_IOP_DEMOSAIC_PASSTHROUGH_COLOR;
-
-  if(bayer4 && !bayerpassing)
-    use_method = DT_IOP_DEMOSAIC_VNG4;
-
-  const gboolean isppg = use_method == DT_IOP_DEMOSAIC_PPG;
-  const gboolean isdual = (use_method & DT_DEMOSAIC_DUAL) && !bayer4 && !true_monochrome;
-  const gboolean islmmse = use_method == DT_IOP_DEMOSAIC_LMMSE;
-  const gboolean passing = bayerpassing
-    || use_method == DT_IOP_DEMOSAIC_PASSTHR_MONOX
-    || use_method == DT_IOP_DEMOSAIC_PASSTHR_COLORX;
-
-  const gboolean capture_support = !passing && !bayer4;
-  const gboolean do_capture = capture_support && p->cs_enabled;
-
-  gtk_widget_set_visible(g->demosaic_method_bayer, bayer);
-  gtk_widget_set_visible(g->demosaic_method_bayerfour, bayer4);
-  gtk_widget_set_visible(g->demosaic_method_xtrans, xtrans);
-  gtk_widget_set_visible(g->demosaic_method_mono, true_monochrome);
-
-  gtk_widget_set_visible(g->cs_radius, do_capture);
-  gtk_widget_set_visible(g->cs_thrs, do_capture);
-  gtk_widget_set_visible(g->cs_boost, do_capture);
-  gtk_widget_set_visible(g->cs_center, do_capture && p->cs_boost);
-  gtk_widget_set_visible(g->cs_iter, do_capture);
-
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(g->cs_enabled), p->cs_enabled);
-  gtk_widget_set_visible(g->cs_enabled, capture_support);
-  gtk_widget_set_visible(GTK_WIDGET(g->capture.expander), do_capture);
-
-  // we might have a wrong method due to xtrans/bayer - mode mismatch
-  const gboolean method_mismatch = use_method != p->demosaicing_method;
-  if(method_mismatch)
-  {
-    if(bayer)
-      dt_bauhaus_combobox_set_from_value(g->demosaic_method_bayer, use_method);
-    else if(xtrans)
-      dt_bauhaus_combobox_set_from_value(g->demosaic_method_xtrans, use_method);
-    else if(bayer4)
-      dt_bauhaus_combobox_set_from_value(g->demosaic_method_bayerfour, use_method);
-    else
-      dt_bauhaus_combobox_set_from_value(g->demosaic_method_mono, use_method);
-
-    /*  If auto-applied from a preset/style from a different sensor type it's demosaicer
-        method was added to the current sensor specific demosaicer combobox.
-        As we know the bad method here, we can remove it from the combobox by testing for it's position.
-    */
-    GtkWidget *demosaicers =  bayer  ? g->demosaic_method_bayer :
-                              xtrans ? g->demosaic_method_xtrans :
-                              bayer4 ? g->demosaic_method_bayerfour : g->demosaic_method_mono;
-    const int pos = dt_bauhaus_combobox_get_from_value(demosaicers, p->demosaicing_method);
-    if(pos >= 0) dt_bauhaus_combobox_remove_at(demosaicers, pos);
-  }
-
-  p->demosaicing_method = use_method;
-
-  gtk_widget_set_visible(g->median_thrs, bayer && isppg);
-  gtk_widget_set_visible(g->greeneq, !passing && !bayer4 && !xtrans && !true_monochrome);
-  gtk_widget_set_visible(g->color_smoothing, !passing && !bayer4 && !isdual && !true_monochrome);
-  gtk_widget_set_visible(g->dual_thrs, isdual);
-  gtk_widget_set_visible(g->lmmse_refine, islmmse);
-
-  const gboolean monomode = use_method == DT_IOP_DEMOSAIC_PASSTHROUGH_MONOCHROME
-                        ||  use_method == DT_IOP_DEMOSAIC_PASSTHR_MONOX;
-  const gboolean was_monomode = oimg->flags & DT_IMAGE_MONOCHROME_BAYER;
-  if((w == g->demosaic_method_bayer || w == g->demosaic_method_xtrans) && monomode != was_monomode)
-  {
-    dt_image_t *img = dt_image_cache_get(self->dev->image_storage.id, 'w');
-    if(monomode)
-      img->flags |= DT_IMAGE_MONOCHROME_BAYER;
-    else
-      img->flags &= ~DT_IMAGE_MONOCHROME_BAYER;
-
-    const int mask_bw = dt_image_monochrome_flags(img);
-    dt_image_cache_write_release(img, DT_IMAGE_CACHE_RELAXED);
-    dt_imageio_update_monochrome_workflow_tag(self->dev->image_storage.id, mask_bw);
-    dt_dev_reload_image(self->dev, self->dev->image_storage.id);
-  }
-
-  if(!w || w != g->dual_thrs)
-  {
-    dt_bauhaus_widget_set_quad_active(g->dual_thrs, FALSE);
-    g->dual_mask = FALSE;
-  }
-  if(!w || w != g->cs_thrs)
-  {
-    dt_bauhaus_widget_set_quad_active(g->cs_thrs, FALSE);
-    g->cs_mask = FALSE;
-  }
-}
-
-void gui_update(dt_iop_module_t *self)
-{
-  gui_changed(self, NULL, NULL);
-  gtk_stack_set_visible_child_name(GTK_STACK(self->widget), self->default_enabled ? "raw" : "non_raw");
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  g->new_radius = 0.0f;
-  g->new_thrs = 0.0f;
-  g->autoradius = FALSE;
-  g->autothrs = FALSE;
-}
-
-static void _dual_thrs_callback(GtkWidget *quad, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-
-  g->dual_mask = dt_bauhaus_widget_get_quad_active(quad);
-
-  dt_bauhaus_widget_set_quad_active(g->cs_thrs, FALSE);
-  g->cs_mask = FALSE;
-  dt_bauhaus_widget_set_quad_active(g->cs_boost, FALSE);
-  g->cs_boost_mask = FALSE;
-
-  dt_dev_reprocess_center(self->dev);
-}
-
-static void _cs_thrs_callback(GtkWidget *quad, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  g->cs_mask = dt_bauhaus_widget_get_quad_active(quad);
-
-  dt_bauhaus_widget_set_quad_active(g->dual_thrs, FALSE);
-  g->dual_mask = FALSE;
-  dt_bauhaus_widget_set_quad_active(g->cs_boost, FALSE);
-  g->cs_boost_mask = FALSE;
-
-  dt_dev_reprocess_center(self->dev);
-}
-
-static void _cs_boost_callback(GtkWidget *quad, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  g->cs_boost_mask = dt_bauhaus_widget_get_quad_active(quad);
-
-  dt_bauhaus_widget_set_quad_active(g->dual_thrs, FALSE);
-  g->dual_mask = FALSE;
-  dt_bauhaus_widget_set_quad_active(g->cs_thrs, FALSE);
-  g->cs_mask = FALSE;
-
-  dt_dev_reprocess_center(self->dev);
-}
-
-static void _cs_radius_callback(GtkWidget *quad, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  g->new_radius = -1.0f;
-  dt_dev_reprocess_center(self->dev);
-}
-
-static void _ui_pipe_done(gpointer instance, dt_iop_module_t *self)
-{
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  if(!g || darktable.gui->reset) return;
-
-  ++darktable.gui->reset;
-  const gboolean new_radius = g->new_radius > 0.0f;
-  const gboolean new_thrs = g->new_thrs > 0.0f;
-  if(new_radius)
-     dt_bauhaus_slider_set_val(g->cs_radius, g->new_radius);
-
-  if(new_thrs)
-    dt_bauhaus_slider_set_val(g->cs_thrs, g->new_thrs);
-
-  --darktable.gui->reset;
-
-  if(new_radius || new_thrs)
-  {
-    dt_print(DT_DEBUG_PIPE, "demosaic UI pipe sets radius=%.3f thrs=%.3f",
-      g->new_radius, g->new_thrs);
-    g->new_radius = g->new_thrs = 0.0f;
-
-    dt_dev_add_history_item(darktable.develop, self, TRUE);
-  }
-}
-
-static void _preset_applied_callback(gpointer instance, dt_iop_module_t *self)
-{
-  const dt_iop_demosaic_params_t *p = self->params;
-  if(p->cs_enabled && (p->cs_radius <= 0.0f || p->cs_thrs <= 0.0f))
-  {
-    dt_print(DT_DEBUG_PIPE, "demosaic auto preset applied, radius=%.3f thrs=%.3f",
-      p->cs_radius, p->cs_thrs);
-    dt_dev_reprocess_center(self->dev);
-  }
-}
-
-void gui_focus(dt_iop_module_t *self, const gboolean in)
-{
-  dt_iop_demosaic_gui_data_t *g = self->gui_data;
-  if(!in)
-  {
-    const gboolean was_masking = g->dual_mask || g->cs_mask || g->cs_boost_mask;
-    dt_bauhaus_widget_set_quad_active(g->dual_thrs, FALSE);
-    g->dual_mask = FALSE;
-    dt_bauhaus_widget_set_quad_active(g->cs_thrs, FALSE);
-    g->cs_mask = FALSE;
-    dt_bauhaus_widget_set_quad_active(g->cs_boost, FALSE);
-    g->cs_boost_mask = FALSE;
-
-    if(was_masking) dt_dev_reprocess_center(self->dev);
-  }
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  dt_iop_demosaic_gui_data_t *g = IOP_GUI_ALLOC(demosaic);
-
-  GtkWidget *box_raw = self->widget = dt_gui_vbox();
-
-  g->demosaic_method_bayer = dt_bauhaus_combobox_from_params(self, "demosaicing_method");
-
-  const int xtranspos = dt_bauhaus_combobox_get_from_value(g->demosaic_method_bayer, DT_DEMOSAIC_XTRANS);
-
-  for(int i=0;i<8;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_bayer, xtranspos);
-  gtk_widget_set_tooltip_text(g->demosaic_method_bayer, _("Bayer sensor demosaicing method, PPG and RCD are fast, AMaZE and LMMSE are slow.\nLMMSE is suited best for high ISO images.\ndual demosaicers increase processing time by blending a VNG variant in a second pass."));
-
-  g->demosaic_method_xtrans = dt_bauhaus_combobox_from_params(self, "demosaicing_method");
-  for(int i=0;i<xtranspos;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_xtrans, 0);
-  dt_bauhaus_combobox_remove_at(g->demosaic_method_xtrans, 7);
-  gtk_widget_set_tooltip_text(g->demosaic_method_xtrans, _("X-Trans sensor demosaicing method, Markesteijn 3-pass and frequency domain chroma are slow.\ndual demosaicers increase processing time by blending a VNG variant in a second pass."));
-
-  g->demosaic_method_bayerfour = dt_bauhaus_combobox_from_params(self, "demosaicing_method");
-  for(int i=0;i<8;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_bayerfour, xtranspos);
-  for(int i=0;i<2;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_bayerfour, 0);
-  for(int i=0;i<4;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_bayerfour, 1);
-  gtk_widget_set_tooltip_text(g->demosaic_method_bayerfour, _("Bayer4 sensor demosaicing methods."));
-
-  g->demosaic_method_mono = dt_bauhaus_combobox_from_params(self, "demosaicing_method");
-  for(int i=0;i<7;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_mono, xtranspos);
-  for(int i=0;i<xtranspos;i++) dt_bauhaus_combobox_remove_at(g->demosaic_method_mono, 0);
-  gtk_widget_set_tooltip_text(g->demosaic_method_mono, _("monochrome sensor demosaicing methods."));
-
-  g->dual_thrs = dt_bauhaus_slider_from_params(self, "dual_thrs");
-  dt_bauhaus_slider_set_digits(g->dual_thrs, 2);
-  gtk_widget_set_tooltip_text(g->dual_thrs, _("contrast threshold for dual demosaic.\nset to 0.0 for high frequency content\n"
-                                                "set to 1.0 for flat content"));
-  dt_bauhaus_widget_set_quad(g->dual_thrs, self, dtgtk_cairo_paint_showmask, TRUE, _dual_thrs_callback,
-                             _("toggle mask visualization"));
-
-  g->median_thrs = dt_bauhaus_slider_from_params(self, "median_thrs");
-  dt_bauhaus_slider_set_digits(g->median_thrs, 3);
-  gtk_widget_set_tooltip_text(g->median_thrs, _("threshold for edge-aware median.\nset to 0.0 to switch off\n"
-                                                "set to 1.0 to ignore edges"));
-  g->lmmse_refine = dt_bauhaus_combobox_from_params(self, "lmmse_refine");
-  gtk_widget_set_tooltip_text(g->lmmse_refine, _("LMMSE refinement steps. the median steps average the output,\nrefine adds some recalculation of red & blue channels"));
-
-  g->color_smoothing = dt_bauhaus_combobox_from_params(self, "color_smoothing");
-  gtk_widget_set_tooltip_text(g->color_smoothing, _("how many color smoothing median steps after demosaicing"));
-
-  g->greeneq = dt_bauhaus_combobox_from_params(self, "green_eq");
-  gtk_widget_set_tooltip_text(g->greeneq, _("green channels matching method"));
-
-  g->cs_enabled = dt_bauhaus_toggle_from_params(self, "cs_enabled");
-  gtk_widget_set_tooltip_text(g->cs_enabled, _("capture sharpen recovers details lost due to in-camera blurring\n"
-                                            "which can be caused by diffraction, the anti-aliasing filter or other\n"
-                                            "sources of gaussian-type blur"));
-
-  dt_gui_new_collapsible_section(&g->capture, "plugins/darkroom/demosaic/expand_capture",
-                                 _("capture sharpen controls"), GTK_BOX(box_raw), DT_ACTION(self));
-  self->widget = GTK_WIDGET(g->capture.container);
-
-  g->cs_iter = dt_bauhaus_slider_from_params(self, "cs_iter");
-  gtk_widget_set_tooltip_text(g->cs_iter, _("set effect strength by iterations"));
-
-  g->cs_radius = dt_bauhaus_slider_from_params(self, "cs_radius");
-  dt_bauhaus_slider_set_digits(g->cs_radius, 2);
-  dt_bauhaus_slider_set_format(g->cs_radius, _(_(" px")));
-  gtk_widget_set_tooltip_text(g->cs_radius, _("capture sharpen radius should reflect the overall gaussian type blur\n"
-                                              "of the camera sensor, possibly the anti-aliasing filter and the lens.\n"
-                                              "increasing this too far will soon lead to artifacts like halos and\n"
-                                              "ringing especially when used with a large 'iterations' setting.\n\n"
-                                              "Note: a radius set to zero will be recalculated automatically the next run. use for presets"));
-  dt_bauhaus_widget_set_quad(g->cs_radius, self, dtgtk_cairo_paint_reset, FALSE, _cs_radius_callback,
-                                            _("calculate the capture sharpen radius from available raw sensor data.\n"
-                                              "for best results avoid cropping or darkroom zooming in"));
-
-  g->cs_thrs = dt_bauhaus_slider_from_params(self, "cs_thrs");
-  gtk_widget_set_tooltip_text(g->cs_thrs, _("restrict capture sharpening to areas with high local contrast,\n"
-                                            "increase to exclude flat areas in very dark or noisy images,\n"
-                                            "decrease for well exposed and low noise images.\n\n"
-                                            "Note: a threshold set to zero will be reset to defaults the next run. use for presets"));
-  dt_bauhaus_widget_set_quad(g->cs_thrs, self, dtgtk_cairo_paint_showmask, TRUE, _cs_thrs_callback, _("visualize sharpened areas"));
-
-  g->cs_boost = dt_bauhaus_slider_from_params(self, "cs_boost");
-  dt_bauhaus_slider_set_digits(g->cs_boost, 2);
-  dt_bauhaus_slider_set_format(g->cs_boost, _(_(" px")));
-  gtk_widget_set_tooltip_text(g->cs_boost, _("further increase sharpen radius at image corners,\n"
-                                             "the sharp center of the image will not be affected"));
-  dt_bauhaus_widget_set_quad(g->cs_boost, self, dtgtk_cairo_paint_showmask, TRUE, _cs_boost_callback, _("visualize the overall radius"));
-
-  g->cs_center = dt_bauhaus_slider_from_params(self, "cs_center");
-  dt_bauhaus_slider_set_format(g->cs_center, "%");
-  dt_bauhaus_slider_set_digits(g->cs_center, 0);
-  gtk_widget_set_tooltip_text(g->cs_center, _("adjust to the sharp image center"));
-
-  // start building top level widget
-  self->widget = gtk_stack_new();
-  gtk_stack_set_homogeneous(GTK_STACK(self->widget), FALSE);
-
-  GtkWidget *label_non_raw = dt_ui_label_new(_("not applicable"));
-  gtk_widget_set_tooltip_text(label_non_raw, _("demosaicing is only used for color raw images"));
-
-  gtk_stack_add_named(GTK_STACK(self->widget), label_non_raw, "non_raw");
-  gtk_stack_add_named(GTK_STACK(self->widget), box_raw, "raw");
-  DT_CONTROL_SIGNAL_HANDLE(DT_SIGNAL_DEVELOP_UI_PIPE_FINISHED, _ui_pipe_done);
-  g->new_radius = 0.0f;
-  g->new_thrs = 0.0f;
-
-  DT_CONTROL_SIGNAL_HANDLE(DT_SIGNAL_PRESET_APPLIED, _preset_applied_callback);
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py

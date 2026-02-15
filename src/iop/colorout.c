@@ -15,8 +15,12 @@
     You should have received a copy of the GNU General Public License
     along with darktable.  If not, see <http://www.gnu.org/licenses/>.
 */
+/* NOTE: This file has been extracted from darktable for the pixelpipe
+ * extraction project. GUI-related code has been removed using
+ * scripts/strip_iop.py. Only image processing logic, parameter structs,
+ * and pipeline functions are retained.
+ */
 
-#include "bauhaus/bauhaus.h"
 #include "common/colorspaces.h"
 #include "common/colorspaces_inline_conversions.h"
 #include "common/dttypes.h"
@@ -28,8 +32,6 @@
 #include "develop/develop.h"
 #include "develop/imageop.h"
 #include "develop/imageop_math.h"
-#include "gui/accelerators.h"
-#include "gui/gtk.h"
 #include "iop/iop_api.h"
 
 #include <assert.h>
@@ -66,11 +68,6 @@ typedef struct dt_iop_colorout_params_t
   char filename[DT_IOP_COLOR_ICC_LEN];
   dt_iop_color_intent_t intent; // $DEFAULT: DT_INTENT_PERCEPTUAL
 } dt_iop_colorout_params_t;
-
-typedef struct dt_iop_colorout_gui_data_t
-{
-  GtkWidget *output_intent, *output_profile;
-} dt_iop_colorout_gui_data_t;
 
 
 const char *name()
@@ -241,45 +238,6 @@ void cleanup_global(dt_iop_module_so_t *self)
   self->data = NULL;
 }
 
-static void intent_changed(GtkWidget *widget, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_colorout_params_t *p = self->params;
-  p->intent = (dt_iop_color_intent_t)dt_bauhaus_combobox_get(widget);
-  dt_dev_add_history_item(darktable.develop, self, TRUE);
-}
-
-static void output_profile_changed(GtkWidget *widget, dt_iop_module_t *self)
-{
-  if(darktable.gui->reset) return;
-  dt_iop_colorout_params_t *p = self->params;
-  int pos = dt_bauhaus_combobox_get(widget);
-
-  for(GList *profiles = darktable.color_profiles->profiles; profiles; profiles = g_list_next(profiles))
-  {
-    dt_colorspaces_color_profile_t *pp = profiles->data;
-    if(pp->out_pos == pos)
-    {
-      p->type = pp->type;
-      g_strlcpy(p->filename, pp->filename, sizeof(p->filename));
-      dt_dev_add_history_item(darktable.develop, self, TRUE);
-
-      DT_CONTROL_SIGNAL_RAISE(DT_SIGNAL_CONTROL_PROFILE_USER_CHANGED, DT_COLORSPACES_PROFILE_TYPE_EXPORT);
-      return;
-    }
-  }
-
-  dt_print(DT_DEBUG_ALWAYS,
-           "[colorout] color profile %s seems to have disappeared!",
-           dt_colorspaces_get_name(p->type, p->filename));
-}
-
-static void _signal_profile_changed(gpointer instance, dt_iop_module_t *self)
-{
-  dt_develop_t *dev = self->dev;
-  if(!dev->gui_attached || dev->gui_leaving) return;
-  dt_dev_reprocess_center(dev);
-}
 
 #if 1
 static float lerp_lut(const float *const lut, const float v)
@@ -779,29 +737,6 @@ void cleanup_pipe(dt_iop_module_t *self, dt_dev_pixelpipe_t *pipe, dt_dev_pixelp
   piece->data = NULL;
 }
 
-void gui_update(dt_iop_module_t *self)
-{
-  dt_iop_colorout_gui_data_t *g = self->gui_data;
-  dt_iop_colorout_params_t *p = self->params;
-
-  dt_bauhaus_combobox_set(g->output_intent, (int)p->intent);
-
-  for(GList *iter = darktable.color_profiles->profiles; iter; iter = g_list_next(iter))
-  {
-    dt_colorspaces_color_profile_t *pp = iter->data;
-    if(pp->out_pos > -1 &&
-       p->type == pp->type && (p->type != DT_COLORSPACE_FILE || !strcmp(p->filename, pp->filename)))
-    {
-      dt_bauhaus_combobox_set(g->output_profile, pp->out_pos);
-      return;
-    }
-  }
-
-  dt_bauhaus_combobox_set(g->output_profile, 0);
-  dt_print(DT_DEBUG_ALWAYS,
-           "[colorout] could not find requested profile `%s'!",
-           dt_colorspaces_get_name(p->type, p->filename));
-}
 
 void init(dt_iop_module_t *self)
 {
@@ -811,65 +746,6 @@ void init(dt_iop_module_t *self)
   self->default_enabled = TRUE;
 }
 
-static void _preference_changed(gpointer instance, dt_iop_module_t *self)
-{
-  dt_iop_colorout_gui_data_t *g = self->gui_data;
-
-  const gboolean force_lcms2 = dt_conf_get_bool("plugins/lighttable/export/force_lcms2");
-  if(force_lcms2)
-  {
-    gtk_widget_set_no_show_all(g->output_intent, FALSE);
-    gtk_widget_set_visible(g->output_intent, TRUE);
-  }
-  else
-  {
-    gtk_widget_set_no_show_all(g->output_intent, TRUE);
-    gtk_widget_set_visible(g->output_intent, FALSE);
-  }
-}
-
-void gui_init(dt_iop_module_t *self)
-{
-  const gboolean force_lcms2 = dt_conf_get_bool("plugins/lighttable/export/force_lcms2");
-
-  dt_iop_colorout_gui_data_t *g = IOP_GUI_ALLOC(colorout);
-
-  DT_BAUHAUS_COMBOBOX_NEW_FULL(g->output_intent, self, NULL, N_("output intent"),
-                               _("rendering intent"),
-                               0, intent_changed, self,
-                               N_("perceptual"),
-                               N_("relative colorimetric"),
-                               NC_("rendering intent", "saturation"),
-                               N_("absolute colorimetric"));
-
-  if(!force_lcms2)
-  {
-    gtk_widget_set_no_show_all(g->output_intent, TRUE);
-    gtk_widget_set_visible(g->output_intent, FALSE);
-  }
-
-  g->output_profile = dt_bauhaus_combobox_new(self);
-  dt_bauhaus_widget_set_label(g->output_profile, NULL, N_("export profile"));
-  for(GList *l = darktable.color_profiles->profiles; l; l = g_list_next(l))
-  {
-    dt_colorspaces_color_profile_t *prof = l->data;
-    if(prof->out_pos > -1) dt_bauhaus_combobox_add(g->output_profile, prof->name);
-  }
-
-  char *tooltip = dt_ioppr_get_location_tooltip("out", _("export ICC profiles"));
-  gtk_widget_set_tooltip_markup(g->output_profile, tooltip);
-  g_free(tooltip);
-
-  self->widget = dt_gui_vbox(g->output_intent, g->output_profile);
-
-  g_signal_connect(G_OBJECT(g->output_profile), "value-changed",
-                   G_CALLBACK(output_profile_changed), (gpointer)self);
-
-  // reload the profiles when the display or softproof profile changed!
-  DT_CONTROL_SIGNAL_HANDLE(DT_SIGNAL_CONTROL_PROFILE_CHANGED, _signal_profile_changed);
-  // update the gui when the preferences changed (i.e. show intent when using lcms2)
-  DT_CONTROL_SIGNAL_HANDLE(DT_SIGNAL_PREFERENCES_CHANGE, _preference_changed);
-}
 
 // clang-format off
 // modelines: These editor modelines have been set for all relevant files by tools/update_modelines.py
