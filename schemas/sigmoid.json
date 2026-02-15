@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/sigmoid",
+  "title": "sigmoid",
+  "description": "attempt to reproduce a corrected tonality using scene-referred S-shaped curve",
+  "type": "object",
+  "version": 3,
+  "properties": {
+    "middle_grey_contrast": {
+      "type": "number",
+      "description": "Contrast around middle gray",
+      "minimum": 0.1,
+      "maximum": 10.0,
+      "default": 1.5
+    },
+    "contrast_skewness": {
+      "type": "number",
+      "description": "Skew of contrast curve",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "display_white_target": {
+      "type": "number",
+      "description": "Target display white luminance (cd/m2)",
+      "minimum": 20.0,
+      "maximum": 1600.0,
+      "default": 100.0
+    },
+    "display_black_target": {
+      "type": "number",
+      "description": "Target display black luminance (cd/m2)",
+      "minimum": 0.0,
+      "maximum": 15.0,
+      "default": 0.0152
+    },
+    "color_processing": {
+      "type": "integer",
+      "description": "Color processing method",
+      "enum": [0, 1],
+      "enumDescriptions": ["per-channel", "RGB ratio"],
+      "default": 0
+    },
+    "hue_preservation": {
+      "type": "number",
+      "description": "Amount of hue preservation",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 100.0
+    },
+    "prim_red_x": {
+      "type": "number",
+      "description": "Red primary X adjustment",
+      "minimum": -0.5,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "prim_red_y": {
+      "type": "number",
+      "description": "Red primary Y adjustment",
+      "minimum": -0.5,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "prim_green_x": {
+      "type": "number",
+      "description": "Green primary X adjustment",
+      "minimum": -0.5,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "prim_green_y": {
+      "type": "number",
+      "description": "Green primary Y adjustment",
+      "minimum": -0.5,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "prim_blue_x": {
+      "type": "number",
+      "description": "Blue primary X adjustment",
+      "minimum": -0.5,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "prim_blue_y": {
+      "type": "number",
+      "description": "Blue primary Y adjustment",
+      "minimum": -0.5,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "prim_version": {
+      "type": "integer",
+      "description": "Primaries version",
+      "default": 0
+    }
+  },
+  "required": ["middle_grey_contrast"],
+  "additionalProperties": false
+}

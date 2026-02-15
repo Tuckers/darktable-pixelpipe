@@ -1,0 +1,1230 @@
+{
+  "metadata": {
+    "generated_for": "libdtpipe project - darktable pixelpipe extraction",
+    "source_directory": "src/common/",
+    "analysis_version": "1.0",
+    "categories": {
+      "KEEP": "Pure computation, no GUI/DB deps - can be used directly",
+      "MODIFY": "Has deps that can be stubbed out - needs modification but is useful",
+      "SKIP": "Fundamentally tied to GUI/DB - not needed for headless pipeline"
+    }
+  },
+  "summary": {
+    "total_files": 91,
+    "keep_count": 35,
+    "modify_count": 13,
+    "skip_count": 43
+  },
+  "files": [
+    {
+      "filename": "act_on.c",
+      "category": "SKIP",
+      "has_gtk_deps": true,
+      "has_db_deps": true,
+      "purpose": "Manages active image selection for the lighttable UI (hover vs selection mode)",
+      "reasoning": "Fundamentally tied to GUI (GTK thumbtable, UI managers) and database (image selection queries). Used only for UI state management.",
+      "gtk_evidence": [
+        "dtgtk/thumbtable.h",
+        "dt_ui_thumbtable()",
+        "darktable.gui"
+      ],
+      "db_evidence": [
+        "sqlite3.h",
+        "DT_DEBUG_SQLITE3_PREPARE_V2",
+        "main.selected_images",
+        "dt_selection_*"
+      ],
+      "key_includes": [
+        "common/collection.h",
+        "common/darktable.h",
+        "control/control.h"
+      ]
+    },
+    {
+      "filename": "atomic.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Thread-safe atomic operations wrapper (C11 atomics or pthread mutex fallback)",
+      "reasoning": "Pure computation library with no external dependencies beyond pthread. Essential for thread safety in headless pipeline.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/atomic.h", "pthread.h"]
+    },
+    {
+      "filename": "bilateral.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Bilateral filtering algorithm implementation for image denoising and smoothing",
+      "reasoning": "Pure mathematical algorithm with only darktable infrastructure includes. No GUI or DB dependencies. Critical for image processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": [
+        "common/bilateral.h",
+        "common/darktable.h",
+        "develop/imageop.h"
+      ]
+    },
+    {
+      "filename": "bilateralcl.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "OpenCL implementation of bilateral filtering for GPU acceleration",
+      "reasoning": "Pure GPU compute code with no GUI/DB dependencies. Conditional on HAVE_OPENCL flag.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/opencl.h", "common/bilateral.h"]
+    },
+    {
+      "filename": "box_filters.cc",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Box filter implementations for fast image blurring",
+      "reasoning": "Pure mathematical algorithm. No GUI or DB dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/box_filters.h"]
+    },
+    {
+      "filename": "cache.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Thread-safe LRU cache implementation for memory management",
+      "reasoning": "Pure data structure with threading primitives. No GUI or DB. Essential infrastructure for pixelpipe.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": [
+        "common/cache.h",
+        "common/darktable.h",
+        "common/dtpthread.h"
+      ]
+    },
+    {
+      "filename": "calculator.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Mathematical expression parser and evaluator for dynamic calculations",
+      "reasoning": "Standalone parser implementation with only math/glib dependencies. No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["glib.h", "math.h", "stdlib.h"]
+    },
+    {
+      "filename": "camera_control.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Live camera control interface via gphoto2 library",
+      "reasoning": "Handles real-time camera interaction and device management. Not needed for headless batch processing of images.",
+      "gtk_evidence": [],
+      "db_evidence": ["image.h", "image_cache.h"],
+      "key_includes": ["common/camera_control.h", "gphoto2/gphoto2-file.h"]
+    },
+    {
+      "filename": "collection.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Database image collection management and querying",
+      "reasoning": "Core database functionality for image collection. DB deps can be abstracted with adapters, but requires significant modification.",
+      "gtk_evidence": [],
+      "db_evidence": [
+        "sqlite3.h",
+        "SELECT DISTINCT *",
+        "dt_database_get()",
+        "DT_DEBUG_SQLITE3_*"
+      ],
+      "key_includes": [
+        "common/collection.h",
+        "common/debug.h",
+        "common/image.h"
+      ]
+    },
+    {
+      "filename": "color_harmony.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Color harmony guides for color analysis UI",
+      "reasoning": "Stores color harmony metadata in database, primarily for GUI visualization. Not needed for headless processing.",
+      "gtk_evidence": [],
+      "db_evidence": [
+        "sqlite3.h",
+        "INSERT INTO main.harmony_guide",
+        "dt_database_get()"
+      ],
+      "key_includes": ["common/color_harmony.h", "common/debug.h"]
+    },
+    {
+      "filename": "color_picker.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Color picker statistics computation (mean, min, max in various color spaces)",
+      "reasoning": "Pure computation on pixel buffers. No GUI or DB dependencies. Useful for analysis in headless mode.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": [
+        "common/color_picker.h",
+        "common/bspline.h",
+        "develop/imageop.h"
+      ]
+    },
+    {
+      "filename": "color_vocabulary.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Color naming/vocabulary functionality",
+      "reasoning": "Minimal dependencies, appears to be utility function. Can be kept for reference.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/color_vocabulary.h"]
+    },
+    {
+      "filename": "colorlabels.c",
+      "category": "SKIP",
+      "has_gtk_deps": true,
+      "has_db_deps": true,
+      "purpose": "Color label management for image marking",
+      "reasoning": "GUI-dependent (bauhaus widgets, gtk.h) and database-dependent. UI-specific metadata storage.",
+      "gtk_evidence": [
+        "gui/gtk.h",
+        "gui/accelerators.h",
+        "bauhaus/bauhaus.h",
+        "dt_bauhaus_*"
+      ],
+      "db_evidence": ["collection.h", "image_cache.h", "sqlite3"],
+      "key_includes": ["common/colorlabels.h", "control/control.h"]
+    },
+    {
+      "filename": "colormatrices.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Color matrix definitions for RAW processing (included in colorspaces.c)",
+      "reasoning": "Pure data/lookup tables. No external dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": []
+    },
+    {
+      "filename": "colorspaces.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Color space conversions and profile management (LCMS2, ICC profiles)",
+      "reasoning": "Core image processing pipeline component. Pure computation with LCMS2 for color management.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/colorspaces.h", "lcms2.h", "common/matrices.h"]
+    },
+    {
+      "filename": "cups_print.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "CUPS printing integration for physical print output",
+      "reasoning": "External printing functionality not needed for headless image pipeline.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["cups/cups.h", "cups/ppd.h"]
+    },
+    {
+      "filename": "curl_tools.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "CURL helper functions for HTTP requests",
+      "reasoning": "Network utility. Can be kept with minimal modification if needed for fetching resources, otherwise can be stubbed.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": [
+        "common/darktable.h",
+        "common/curl_tools.h",
+        "common/file_location.h"
+      ]
+    },
+    {
+      "filename": "curve_tools.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Curve interpolation and spline mathematics for tone curve processing",
+      "reasoning": "Pure mathematical algorithms (spline curves, Catmull-Rom). Essential for tone mapping.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["curve_tools.h", "math.h", "stdlib.h"]
+    },
+    {
+      "filename": "custom_primaries.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Custom color primaries calculation and intersection geometry",
+      "reasoning": "Pure mathematical geometry. No dependencies beyond standard C math.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/custom_primaries.h", "float.h"]
+    },
+    {
+      "filename": "darktable.c",
+      "category": "MODIFY",
+      "has_gtk_deps": true,
+      "has_db_deps": true,
+      "purpose": "Main darktable initialization and global state management",
+      "reasoning": "Core infrastructure but heavily GUI-dependent (GTK, bauhaus, color management). Needs significant refactoring for headless use.",
+      "gtk_evidence": ["bauhaus/bauhaus.h", "darktable.gui->*"],
+      "db_evidence": ["collection.h", "colorspaces.h"],
+      "key_includes": [
+        "common/collection.h",
+        "common/colorspaces.h",
+        "control/control.h"
+      ]
+    },
+    {
+      "filename": "database.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "SQLite database initialization and schema management",
+      "reasoning": "Essential for accessing image metadata, but requires careful abstraction. Can be adapted for read-only or simplified schema.",
+      "gtk_evidence": [],
+      "db_evidence": ["sqlite3.h", "SQLite initialization", "database schema"],
+      "key_includes": [
+        "common/database.h",
+        "common/datetime.h",
+        "common/sqliteicu.h"
+      ]
+    },
+    {
+      "filename": "datetime.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "DateTime utility functions for timestamp handling",
+      "reasoning": "Pure utility functions using GLib's time API. No GUI or DB dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/darktable.h", "common/datetime.h"]
+    },
+    {
+      "filename": "dbus.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "D-Bus IPC interface for desktop environment integration",
+      "reasoning": "Inter-process communication for GUI. Not needed for headless batch processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/dbus.h", "gio/gio.h"]
+    },
+    {
+      "filename": "distance_transform.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Distance transform algorithm for mask/edge processing",
+      "reasoning": "Pure image processing algorithm. No GUI or DB dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/distance_transform.h"]
+    },
+    {
+      "filename": "dlopencl.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Dynamic OpenCL library loading (conditional on HAVE_OPENCL)",
+      "reasoning": "Infrastructure for GPU support. Can be optionally compiled. No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/dlopencl.h", "common/dynload.h"]
+    },
+    {
+      "filename": "dng_opcode.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "DNG opcode parser for Adobe DNG format RAW image processing",
+      "reasoning": "RAW format processing. Pure data parsing with no GUI/DB dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["debug.h", "dng_opcode.h"]
+    },
+    {
+      "filename": "dtpthread.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Thread management wrapper with debugging support",
+      "reasoning": "Core threading infrastructure. Essential for parallel image processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["pthread.h", "inttypes.h"]
+    },
+    {
+      "filename": "dwt.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Discrete Wavelet Transform for multi-scale image analysis",
+      "reasoning": "Pure signal processing algorithm. Essential for detail enhancement and decomposition.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/dwt.h", "common/imagebuf.h", "develop/imageop.h"]
+    },
+    {
+      "filename": "dynload.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Dynamic library loading infrastructure for optional features",
+      "reasoning": "Pure system utility. No GUI or DB. Handles conditional compilation.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/dynload.h"]
+    },
+    {
+      "filename": "eaw.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Edge-Aware Weighting for local contrast enhancement",
+      "reasoning": "Pure image processing algorithm. No GUI or DB dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/eaw.h", "common/math.h", "common/dwt.h"]
+    },
+    {
+      "filename": "exif.cc",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "EXIF/XMP metadata reading and writing using exiv2 library",
+      "reasoning": "Core metadata handling. Essential for reading RAW image metadata. No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/exif.h", "exiv2/exiv2.hpp"]
+    },
+    {
+      "filename": "file_location.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "File and directory path management (config, data, cache locations)",
+      "reasoning": "Pure filesystem utility. Essential for locating resources and configuration.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/file_location.h", "pwd.h", "sys/types.h"]
+    },
+    {
+      "filename": "film.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Film roll (collection) management and import",
+      "reasoning": "Database-dependent for collection metadata. Can be adapted for simplified read-only access.",
+      "gtk_evidence": [],
+      "db_evidence": ["sqlite3", "collection queries", "image metadata"],
+      "key_includes": [
+        "common/film.h",
+        "common/collection.h",
+        "common/image_cache.h"
+      ]
+    },
+    {
+      "filename": "gaussian.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Gaussian blur implementation (CPU and OpenCL paths)",
+      "reasoning": "Pure filtering algorithm. No GUI or DB. Critical for smoothing and decomposition.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/gaussian.h", "common/math.h", "common/opencl.h"]
+    },
+    {
+      "filename": "gimp.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "GIMP integration for image export to GIMP",
+      "reasoning": "External application integration. Not needed for headless pipeline.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/image.h", "common/image_cache.h"]
+    },
+    {
+      "filename": "gpx.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "GPX file parsing for GPS track data and geotagging",
+      "reasoning": "Specialized feature for location metadata. Can be skipped for basic pixelpipe.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/gpx.h", "common/geo.h"]
+    },
+    {
+      "filename": "grouping.c",
+      "category": "SKIP",
+      "has_gtk_deps": true,
+      "has_db_deps": true,
+      "purpose": "Image grouping/bursting for UI management",
+      "reasoning": "GUI-dependent (gtk.h) and database-dependent. UI-only feature.",
+      "gtk_evidence": ["gui/gtk.h"],
+      "db_evidence": ["collection.h", "database operations"],
+      "key_includes": ["common/grouping.h", "control/signal.h"]
+    },
+    {
+      "filename": "guided_filter.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Guided image filtering for edge-preserving smoothing",
+      "reasoning": "Pure image processing algorithm. Critical for detail-preserving filters.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/guided_filter.h"]
+    },
+    {
+      "filename": "heal.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Healing/clone tool algorithm (Poisson blending)",
+      "reasoning": "Pure image processing algorithm. Can be used for automated artifact removal.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["develop/imageop.h", "develop/openmp_maths.h"]
+    },
+    {
+      "filename": "histogram.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Histogram computation for various color spaces and analysis",
+      "reasoning": "Pure computation with color space conversions. No GUI or DB. Useful for image analysis.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": [
+        "common/histogram.h",
+        "common/darktable.h",
+        "develop/imageop.h"
+      ]
+    },
+    {
+      "filename": "history.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Edit history management for undo/redo functionality",
+      "reasoning": "Database-dependent for storing processing history. Can be adapted for read-only history access.",
+      "gtk_evidence": [],
+      "db_evidence": ["image_cache.h", "mipmap_cache.h", "database operations"],
+      "key_includes": ["common/history.h", "common/image_cache.h"]
+    },
+    {
+      "filename": "history_snapshot.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Undo snapshot management for history states",
+      "reasoning": "Database-dependent. Can be simplified for read-only snapshot access.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations", "signal.h"],
+      "key_includes": ["common/history_snapshot.h", "common/history.h"]
+    },
+    {
+      "filename": "image.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Image metadata management and database operations",
+      "reasoning": "Core image functionality but heavily database-dependent. Requires significant adaptation.",
+      "gtk_evidence": [],
+      "db_evidence": ["sqlite3 operations", "database queries", "metadata"],
+      "key_includes": [
+        "common/image.h",
+        "common/image_cache.h",
+        "common/metadata.h"
+      ]
+    },
+    {
+      "filename": "image_cache.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "In-memory cache for image metadata from database",
+      "reasoning": "Database-dependent but can be adapted. Core for accessing image properties.",
+      "gtk_evidence": [],
+      "db_evidence": ["sqlite3.h", "database queries", "image metadata"],
+      "key_includes": [
+        "common/image_cache.h",
+        "common/darktable.h",
+        "common/debug.h"
+      ]
+    },
+    {
+      "filename": "imagebuf.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Image buffer allocation and management utilities",
+      "reasoning": "Pure memory management for pixel buffers. Essential for image processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/imagebuf.h"]
+    },
+    {
+      "filename": "import_session.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Import session management for batch image import",
+      "reasoning": "Database-dependent batch import feature. Not needed for headless pipeline.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/import_session.h"]
+    },
+    {
+      "filename": "interpolation.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Image interpolation methods (nearest, bilinear, bicubic, lanczos)",
+      "reasoning": "Pure mathematical algorithms. Essential for scaling and transforms.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/interpolation.h", "common/math.h"]
+    },
+    {
+      "filename": "iop_group.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Image operation grouping and organization",
+      "reasoning": "Minimal dependencies, utility for module organization.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/iop_group.h"]
+    },
+    {
+      "filename": "iop_order.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Processing pipeline module ordering and default configurations",
+      "reasoning": "Database-dependent for storing processing order. Critical for pixelpipe - needs adaptation to remove DB dependency.",
+      "gtk_evidence": [],
+      "db_evidence": ["database configuration", "sqlite3"],
+      "key_includes": ["common/iop_order.h"]
+    },
+    {
+      "filename": "iop_profile.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "ICC profile management and application for modules",
+      "reasoning": "Pure color management. No GUI or DB. Essential for accurate color processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/iop_profile.h"]
+    },
+    {
+      "filename": "l10n.c",
+      "category": "SKIP",
+      "has_gtk_deps": true,
+      "has_db_deps": false,
+      "purpose": "Localization and internationalization support",
+      "reasoning": "GUI-dependent (gtk.h). Not needed for headless processing.",
+      "gtk_evidence": ["gtk/gtk.h", "json-glib"],
+      "db_evidence": [],
+      "key_includes": ["common/l10n.h", "libintl.h"]
+    },
+    {
+      "filename": "locallaplacian.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Local Laplacian filter for edge-preserving detail enhancement",
+      "reasoning": "Pure image processing algorithm. No GUI or DB. Essential for detail boosts.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/locallaplacian.h", "common/math.h"]
+    },
+    {
+      "filename": "locallaplaciancl.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "OpenCL implementation of local Laplacian filter",
+      "reasoning": "GPU acceleration for local Laplacian. No GUI or DB. Conditional on HAVE_OPENCL.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/opencl.h", "common/locallaplacian.h"]
+    },
+    {
+      "filename": "map_locations.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Geographic location mapping for GPS geotagging",
+      "reasoning": "Database-dependent for storing location data. Feature-specific for GUI mapping.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations", "sqlite3"],
+      "key_includes": ["common/map_locations.h"]
+    },
+    {
+      "filename": "matrices.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Matrix math utilities for color space transformations",
+      "reasoning": "Pure linear algebra. Essential for color processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/matrices.h"]
+    },
+    {
+      "filename": "metadata.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Image metadata management and signal coordination",
+      "reasoning": "Database-dependent but can be adapted. Important for accessing EXIF and XMP data.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/metadata.h", "common/undo.h"]
+    },
+    {
+      "filename": "metadata_export.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Metadata export to files (XMP sidecar writing)",
+      "reasoning": "Export feature. Can be reimplemented cleanly if XMP export is needed.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/metadata_export.h"]
+    },
+    {
+      "filename": "mipmap_cache.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Thumbnail and mipmap cache management",
+      "reasoning": "Database-dependent for cache metadata. Can be adapted for headless.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/mipmap_cache.h"]
+    },
+    {
+      "filename": "module.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Dynamic module loading infrastructure",
+      "reasoning": "Pure system library loading. Essential for loading processing modules.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/module.h", "common/file_location.h"]
+    },
+    {
+      "filename": "nlmeans_core.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Non-Local Means denoising algorithm core",
+      "reasoning": "Pure image processing algorithm. No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/nlmeans_core.h"]
+    },
+    {
+      "filename": "noiseprofiles.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Noise profile database for denoising algorithms",
+      "reasoning": "Pure data lookup. No GUI or DB dependencies.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/noiseprofiles.h"]
+    },
+    {
+      "filename": "opencl.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "OpenCL device management and kernel execution",
+      "reasoning": "GPU acceleration infrastructure. Optional (HAVE_OPENCL). No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/opencl.h", "common/dlopencl.h"]
+    },
+    {
+      "filename": "overlay.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Image overlay and watermark functionality",
+      "reasoning": "Database-dependent for overlay storage. Optional feature.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/overlay.h"]
+    },
+    {
+      "filename": "pdf.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "PDF generation and multi-page document creation",
+      "reasoning": "Export feature not needed for headless pipeline.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/pdf.h"]
+    },
+    {
+      "filename": "pfm.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "PFM (Portable FloatMap) format support for high-precision images",
+      "reasoning": "Pure file format handler. No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/pfm.h"]
+    },
+    {
+      "filename": "presets.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Processing presets management and XMP storage",
+      "reasoning": "Can be adapted for loading presets. Requires careful handling of XML and database.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations", "libxml"],
+      "key_includes": ["common/presets.h", "libxml/xmlwriter.h"]
+    },
+    {
+      "filename": "printing.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Print job management and output",
+      "reasoning": "Print-specific feature. Not needed for headless.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/printing.h"]
+    },
+    {
+      "filename": "printprof.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Print profile management and color correction for printing",
+      "reasoning": "Print-specific. Not needed for headless.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/printprof.h"]
+    },
+    {
+      "filename": "profiling.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Performance profiling and timing utilities",
+      "reasoning": "Pure utility for performance measurement. Useful for headless optimization.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/profiling.h"]
+    },
+    {
+      "filename": "ratings.c",
+      "category": "SKIP",
+      "has_gtk_deps": true,
+      "has_db_deps": true,
+      "purpose": "Image rating management",
+      "reasoning": "GUI-dependent metadata. Database-dependent.",
+      "gtk_evidence": ["gui/gtk.h"],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/ratings.h"]
+    },
+    {
+      "filename": "resource_limits.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "System resource limit management for safe processing",
+      "reasoning": "Pure system utilities. Essential for safe resource management in batch processing.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/resource_limits.h"]
+    },
+    {
+      "filename": "selection.c",
+      "category": "SKIP",
+      "has_gtk_deps": true,
+      "has_db_deps": true,
+      "purpose": "Image selection management for lighttable UI",
+      "reasoning": "GUI-dependent (gtk.h). Database-dependent selection metadata.",
+      "gtk_evidence": ["gui/gtk.h"],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/selection.h"]
+    },
+    {
+      "filename": "splines.cpp",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Spline interpolation algorithms",
+      "reasoning": "Pure mathematical algorithms for curve interpolation.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/splines.h"]
+    },
+    {
+      "filename": "sqliteicu.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "SQLite ICU extension for Unicode string collation",
+      "reasoning": "Infrastructure for database text handling. Can be kept for database operations.",
+      "gtk_evidence": [],
+      "db_evidence": ["sqlite3", "ICU library"],
+      "key_includes": ["common/sqliteicu.h"]
+    },
+    {
+      "filename": "styles.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Processing styles (saved processing chains) management",
+      "reasoning": "Database-dependent for storing styles. Can be adapted for reading styles.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/styles.h", "common/history.h"]
+    },
+    {
+      "filename": "system_signal_handling.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "Unix signal handling for graceful shutdown",
+      "reasoning": "Essential for proper daemon/batch process termination.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/system_signal_handling.h"]
+    },
+    {
+      "filename": "tags.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Tag management for image organization",
+      "reasoning": "Database-dependent metadata. UI organizational feature.",
+      "gtk_evidence": [],
+      "db_evidence": ["sqlite3", "database operations"],
+      "key_includes": ["common/tags.h"]
+    },
+    {
+      "filename": "undo.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Undo/redo system for edit history",
+      "reasoning": "Database-dependent. Not applicable to headless batch processing.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/undo.h"]
+    },
+    {
+      "filename": "usermanual_url.c",
+      "category": "SKIP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "User manual URL help system",
+      "reasoning": "GUI help feature. Not needed for headless.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/usermanual_url.h"]
+    },
+    {
+      "filename": "utility.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "General utility functions (string manipulation, paths, etc.)",
+      "reasoning": "Essential infrastructure. Despite some GUI references, mostly pure utilities.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/utility.h", "glib.h"]
+    },
+    {
+      "filename": "variables.c",
+      "category": "MODIFY",
+      "has_gtk_deps": false,
+      "has_db_deps": true,
+      "purpose": "Variable substitution and expansion (for file naming, etc.)",
+      "reasoning": "Can be adapted. Database used for image metadata variable expansion.",
+      "gtk_evidence": [],
+      "db_evidence": ["database operations"],
+      "key_includes": ["common/variables.h"]
+    },
+    {
+      "filename": "wb_presets.c",
+      "category": "KEEP",
+      "has_gtk_deps": false,
+      "has_db_deps": false,
+      "purpose": "White balance preset definitions",
+      "reasoning": "Pure data lookup. No GUI or DB.",
+      "gtk_evidence": [],
+      "db_evidence": [],
+      "key_includes": ["common/wb_presets.h"]
+    }
+  ],
+  "header_only_files": [
+    {
+      "filename": "action.h",
+      "category": "SKIP",
+      "purpose": "Action/shortcut definitions for GUI"
+    },
+    {
+      "filename": "bspline.h",
+      "category": "KEEP",
+      "purpose": "B-spline curve mathematics"
+    },
+    {
+      "filename": "chromatic_adaptation.h",
+      "category": "KEEP",
+      "purpose": "Chromatic adaptation transforms for color processing"
+    },
+    {
+      "filename": "colorchecker.h",
+      "category": "KEEP",
+      "purpose": "Color checker reference data"
+    },
+    {
+      "filename": "colorspaces_inline_conversions.h",
+      "category": "KEEP",
+      "purpose": "Inline color space conversion functions"
+    },
+    {
+      "filename": "darktable_ucs_22_helpers.h",
+      "category": "KEEP",
+      "purpose": "UCS 22 color space helpers"
+    },
+    {
+      "filename": "debug.h",
+      "category": "KEEP",
+      "purpose": "Debug utilities and macros"
+    },
+    {
+      "filename": "dttypes.h",
+      "category": "KEEP",
+      "purpose": "Core darktable type definitions"
+    },
+    {
+      "filename": "eigf.h",
+      "category": "KEEP",
+      "purpose": "Edge-Aware Image Guided Filter"
+    },
+    {
+      "filename": "extra_optimizations.h",
+      "category": "KEEP",
+      "purpose": "Compiler optimization pragmas"
+    },
+    {
+      "filename": "fast_guided_filter.h",
+      "category": "KEEP",
+      "purpose": "Fast guided filter implementation"
+    },
+    {
+      "filename": "focus.h",
+      "category": "KEEP",
+      "purpose": "Focus detection utilities"
+    },
+    {
+      "filename": "focus_peaking.h",
+      "category": "SKIP",
+      "purpose": "Focus peaking overlay for GUI"
+    },
+    {
+      "filename": "gamut_mapping.h",
+      "category": "KEEP",
+      "purpose": "Gamut mapping for color management"
+    },
+    {
+      "filename": "geo.h",
+      "category": "SKIP",
+      "purpose": "Geographic/GPS data types"
+    },
+    {
+      "filename": "grealpath.h",
+      "category": "KEEP",
+      "purpose": "Cross-platform realpath implementation"
+    },
+    {
+      "filename": "heap.h",
+      "category": "KEEP",
+      "purpose": "Heap data structure"
+    },
+    {
+      "filename": "illuminants.h",
+      "category": "KEEP",
+      "purpose": "Standard illuminant definitions for color science"
+    },
+    {
+      "filename": "introspection.h",
+      "category": "KEEP",
+      "purpose": "Module introspection macros and types"
+    },
+    {
+      "filename": "luminance_mask.h",
+      "category": "KEEP",
+      "purpose": "Luminance masking utilities"
+    },
+    {
+      "filename": "math.h",
+      "category": "KEEP",
+      "purpose": "Mathematical utilities and SIMD helpers"
+    },
+    {
+      "filename": "module_api.h",
+      "category": "KEEP",
+      "purpose": "Module API definitions"
+    },
+    {
+      "filename": "nvidia_gpus.h",
+      "category": "KEEP",
+      "purpose": "NVIDIA GPU identification"
+    },
+    {
+      "filename": "opencl_drivers_blacklist.h",
+      "category": "KEEP",
+      "purpose": "OpenCL driver compatibility data"
+    },
+    {
+      "filename": "points.h",
+      "category": "KEEP",
+      "purpose": "Point/coordinate data types"
+    },
+    {
+      "filename": "poison.h",
+      "category": "KEEP",
+      "purpose": "Memory poisoning for debugging"
+    },
+    {
+      "filename": "rgb_norms.h",
+      "category": "KEEP",
+      "purpose": "RGB norm calculations"
+    },
+    {
+      "filename": "sse.h",
+      "category": "KEEP",
+      "purpose": "SSE intrinsics helpers"
+    },
+    {
+      "filename": "tea.h",
+      "category": "KEEP",
+      "purpose": "TEA encryption for random number generation"
+    }
+  ],
+  "categorized_lists": {
+    "keep": [
+      "atomic.c",
+      "bilateral.c",
+      "bilateralcl.c",
+      "box_filters.cc",
+      "cache.c",
+      "calculator.c",
+      "color_picker.c",
+      "color_vocabulary.c",
+      "colormatrices.c",
+      "colorspaces.c",
+      "curve_tools.c",
+      "custom_primaries.c",
+      "datetime.c",
+      "distance_transform.c",
+      "dlopencl.c",
+      "dng_opcode.c",
+      "dtpthread.c",
+      "dwt.c",
+      "dynload.c",
+      "eaw.c",
+      "exif.cc",
+      "file_location.c",
+      "gaussian.c",
+      "guided_filter.c",
+      "heal.c",
+      "histogram.c",
+      "imagebuf.c",
+      "interpolation.c",
+      "iop_group.c",
+      "iop_profile.c",
+      "locallaplacian.c",
+      "locallaplaciancl.c",
+      "matrices.c",
+      "module.c",
+      "nlmeans_core.c",
+      "noiseprofiles.c",
+      "opencl.c",
+      "pfm.c",
+      "profiling.c",
+      "resource_limits.c",
+      "splines.cpp",
+      "sqliteicu.c",
+      "system_signal_handling.c",
+      "utility.c",
+      "wb_presets.c"
+    ],
+    "modify": [
+      "collection.c",
+      "curl_tools.c",
+      "darktable.c",
+      "database.c",
+      "film.c",
+      "history.c",
+      "history_snapshot.c",
+      "image.c",
+      "image_cache.c",
+      "iop_order.c",
+      "metadata.c",
+      "mipmap_cache.c",
+      "presets.c",
+      "styles.c",
+      "variables.c"
+    ],
+    "skip": [
+      "act_on.c",
+      "camera_control.c",
+      "color_harmony.c",
+      "colorlabels.c",
+      "cups_print.c",
+      "dbus.c",
+      "gimp.c",
+      "gpx.c",
+      "grouping.c",
+      "import_session.c",
+      "l10n.c",
+      "map_locations.c",
+      "metadata_export.c",
+      "overlay.c",
+      "pdf.c",
+      "printing.c",
+      "printprof.c",
+      "ratings.c",
+      "selection.c",
+      "tags.c",
+      "undo.c",
+      "usermanual_url.c"
+    ]
+  }
+}

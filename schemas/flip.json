@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/flip",
+  "title": "orientation",
+  "description": "flip or rotate image by step of 90 degrees",
+  "type": "object",
+  "version": 2,
+  "properties": {
+    "orientation": {
+      "type": "integer",
+      "description": "Image orientation flags",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 7, 256],
+      "enumDescriptions": [
+        "none",
+        "flip horizontally",
+        "flip vertically",
+        "flip both",
+        "swap XY",
+        "rotate 90 CW",
+        "rotate 90 CCW",
+        "rotate 180",
+        "auto from EXIF"
+      ],
+      "default": 256
+    }
+  },
+  "required": ["orientation"],
+  "additionalProperties": false
+}

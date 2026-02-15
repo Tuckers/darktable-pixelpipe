@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/diffuse",
+  "title": "diffuse or sharpen",
+  "description": "simulate directional diffusion of light with heat transfer model to apply iterative edge-oriented blur, inpaint, or deconvolution",
+  "type": "object",
+  "version": 2,
+  "properties": {
+    "iterations": {
+      "type": "integer",
+      "description": "Number of iterations",
+      "minimum": 0,
+      "maximum": 500,
+      "default": 1
+    },
+    "sharpness": {
+      "type": "number",
+      "description": "Sharpness (contrast equalizer effect)",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "radius": {
+      "type": "integer",
+      "description": "Radius span",
+      "minimum": 0,
+      "maximum": 2048,
+      "default": 8
+    },
+    "regularization": {
+      "type": "number",
+      "description": "Edge sensitivity",
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "default": 0.0
+    },
+    "variance_threshold": {
+      "type": "number",
+      "description": "Edge threshold",
+      "minimum": -2.0,
+      "maximum": 2.0,
+      "default": 0.0
+    },
+    "anisotropy_first": {
+      "type": "number",
+      "description": "1st order anisotropy",
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "default": 0.0
+    },
+    "anisotropy_second": {
+      "type": "number",
+      "description": "2nd order anisotropy",
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "default": 0.0
+    },
+    "anisotropy_third": {
+      "type": "number",
+      "description": "3rd order anisotropy",
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "default": 0.0
+    },
+    "anisotropy_fourth": {
+      "type": "number",
+      "description": "4th order anisotropy",
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "default": 0.0
+    },
+    "threshold": {
+      "type": "number",
+      "description": "Luminance masking threshold",
+      "minimum": 0.0,
+      "maximum": 8.0,
+      "default": 0.0
+    },
+    "first": {
+      "type": "number",
+      "description": "1st order speed",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "second": {
+      "type": "number",
+      "description": "2nd order speed",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "third": {
+      "type": "number",
+      "description": "3rd order speed",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "fourth": {
+      "type": "number",
+      "description": "4th order speed",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "radius_center": {
+      "type": "integer",
+      "description": "Central radius",
+      "minimum": 0,
+      "maximum": 1024,
+      "default": 0
+    }
+  },
+  "required": ["iterations"],
+  "additionalProperties": false
+}

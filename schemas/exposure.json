@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/exposure",
+  "title": "exposure",
+  "description": "Redo the exposure of the shot as if you were still in-camera, using a color-safe brightening similar to increasing ISO setting",
+  "type": "object",
+  "version": 7,
+  "properties": {
+    "mode": {
+      "type": "integer",
+      "description": "Exposure mode",
+      "enum": [0, 1],
+      "enumDescriptions": ["manual", "automatic (deflicker)"],
+      "default": 0
+    },
+    "black": {
+      "type": "number",
+      "description": "Black level correction",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "exposure": {
+      "type": "number",
+      "description": "Exposure adjustment in EV",
+      "minimum": -18.0,
+      "maximum": 18.0,
+      "default": 0.0
+    },
+    "deflicker_percentile": {
+      "type": "number",
+      "description": "Percentile for deflicker metering",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 50.0
+    },
+    "deflicker_target_level": {
+      "type": "number",
+      "description": "Target level for deflicker (EV below overexposure)",
+      "minimum": -18.0,
+      "maximum": 18.0,
+      "default": -4.0
+    },
+    "compensate_exposure_bias": {
+      "type": "boolean",
+      "description": "Compensate for camera exposure bias",
+      "default": false
+    },
+    "compensate_hilite_pres": {
+      "type": "boolean",
+      "description": "Compensate for highlight preservation mode",
+      "default": true
+    }
+  },
+  "required": ["mode", "black", "exposure"],
+  "additionalProperties": false
+}

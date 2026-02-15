@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/filmicrgb",
+  "title": "filmic rgb",
+  "description": "attempt to reproduce the tonality and color response of analog film using scene-referred data",
+  "type": "object",
+  "version": 6,
+  "properties": {
+    "grey_point_source": {
+      "type": "number",
+      "description": "Middle gray luminance of the scene",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 18.45
+    },
+    "black_point_source": {
+      "type": "number",
+      "description": "Black relative exposure (EV)",
+      "minimum": -16.0,
+      "maximum": -0.1,
+      "default": -8.0
+    },
+    "white_point_source": {
+      "type": "number",
+      "description": "White relative exposure (EV)",
+      "minimum": 0.1,
+      "maximum": 16.0,
+      "default": 4.0
+    },
+    "reconstruct_threshold": {
+      "type": "number",
+      "description": "Highlight reconstruction threshold",
+      "minimum": -6.0,
+      "maximum": 6.0,
+      "default": 0.0
+    },
+    "reconstruct_feather": {
+      "type": "number",
+      "description": "Highlight reconstruction transition",
+      "minimum": 0.25,
+      "maximum": 6.0,
+      "default": 3.0
+    },
+    "reconstruct_structure_vs_color": {
+      "type": "number",
+      "description": "Structure vs color blend in highlight reconstruction",
+      "minimum": -100.0,
+      "maximum": 100.0,
+      "default": 0.0
+    },
+    "reconstruct_bloom_vs_details": {
+      "type": "number",
+      "description": "Bloom vs details blend in highlight reconstruction",
+      "minimum": -100.0,
+      "maximum": 100.0,
+      "default": 0.0
+    },
+    "reconstruct_grey_vs_color": {
+      "type": "number",
+      "description": "Gray vs color blend in highlight reconstruction",
+      "minimum": -100.0,
+      "maximum": 100.0,
+      "default": 0.0
+    },
+    "security_factor": {
+      "type": "number",
+      "description": "Safety margin for auto-tuners",
+      "minimum": -200.0,
+      "maximum": 200.0,
+      "default": 0.0
+    },
+    "grey_point_target": {
+      "type": "number",
+      "description": "Target middle gray luminance",
+      "minimum": 0.1,
+      "maximum": 50.0,
+      "default": 18.45
+    },
+    "black_point_target": {
+      "type": "number",
+      "description": "Target black luminance",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 0.0
+    },
+    "white_point_target": {
+      "type": "number",
+      "description": "Target white luminance",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 100.0
+    },
+    "output_power": {
+      "type": "number",
+      "description": "Hardness/power for S-curve",
+      "minimum": 1.0,
+      "maximum": 10.0,
+      "default": 4.0
+    },
+    "latitude": {
+      "type": "number",
+      "description": "Contrast in the mid-tones",
+      "minimum": 0.01,
+      "maximum": 100.0,
+      "default": 33.0
+    },
+    "contrast": {
+      "type": "number",
+      "description": "Hardness of the S-curve",
+      "minimum": 0.0,
+      "maximum": 5.0,
+      "default": 1.0
+    },
+    "saturation": {
+      "type": "number",
+      "description": "Extreme luminance saturation",
+      "minimum": -200.0,
+      "maximum": 200.0,
+      "default": 0.0
+    },
+    "balance": {
+      "type": "number",
+      "description": "Shadow/highlight balance",
+      "minimum": -50.0,
+      "maximum": 50.0,
+      "default": 0.0
+    },
+    "noise_level": {
+      "type": "number",
+      "description": "Luminance noise level for reconstruction",
+      "minimum": 0.0,
+      "maximum": 6.0,
+      "default": 0.2
+    },
+    "noise_distribution": {
+      "type": "integer",
+      "description": "Type of noise distribution",
+      "enum": [0, 1, 2],
+      "enumDescriptions": ["uniform", "Gaussian", "Poissonian"],
+      "default": 1
+    },
+    "preserve_color": {
+      "type": "integer",
+      "description": "Color preservation method",
+      "enum": [0, 1, 2, 3, 4, 5],
+      "enumDescriptions": ["none", "max RGB", "luminance Y", "RGB power norm", "RGB euclidean norm", "RGB power norm v2"],
+      "default": 3
+    },
+    "version": {
+      "type": "integer",
+      "description": "Filmic colorscience version",
+      "enum": [0, 1, 2, 3, 4, 5],
+      "enumDescriptions": ["v1 (2018)", "v2 (2019)", "v3 (2019)", "v4 (2020)", "v5 (2021)", "v6 (2022)"],
+      "default": 5
+    },
+    "auto_hardness": {
+      "type": "boolean",
+      "description": "Auto-tune hardness/power",
+      "default": true
+    },
+    "custom_grey": {
+      "type": "boolean",
+      "description": "Use custom target middle gray",
+      "default": false
+    },
+    "high_quality_reconstruction": {
+      "type": "integer",
+      "description": "Number of reconstruction iterations",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 1
+    },
+    "spline_version": {
+      "type": "integer",
+      "description": "Spline version for tone mapping curve",
+      "enum": [0, 1, 2],
+      "default": 2
+    },
+    "enable_highlight_reconstruction": {
+      "type": "boolean",
+      "description": "Enable highlight reconstruction",
+      "default": true
+    },
+    "compensate_icc_black": {
+      "type": "boolean",
+      "description": "Compensate output ICC black point",
+      "default": false
+    }
+  },
+  "required": ["grey_point_source", "black_point_source", "white_point_source"],
+  "additionalProperties": false
+}

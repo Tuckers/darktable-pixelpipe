@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/velvia",
+  "title": "velvia",
+  "description": "attempt to boost color saturation mimicking Fuji Velvia film (display-referred)",
+  "type": "object",
+  "version": 2,
+  "properties": {
+    "strength": {
+      "type": "number",
+      "description": "Effect strength",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 25.0
+    },
+    "bias": {
+      "type": "number",
+      "description": "Mid-tones bias",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 1.0
+    }
+  },
+  "required": ["strength"],
+  "additionalProperties": false
+}

@@ -19,7 +19,7 @@
 
 ### Task 0.1: Map IOP Dependencies
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** darktable `src/iop/` directory
 - **Output:** `analysis/iop-dependencies.json`
 
@@ -41,7 +41,7 @@ Output as a JSON array of objects.
 
 ### Task 0.2: Identify Core vs Optional Modules
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** IOP dependency analysis + personal usage patterns
 - **Output:** `analysis/module-priority.md`
 
@@ -75,7 +75,7 @@ For each module, note:
 
 ### Task 0.3: Map common/ Dependencies
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** darktable `src/common/` directory
 - **Output:** `analysis/common-dependencies.json`
 
@@ -101,7 +101,7 @@ Output as JSON with reasoning for each file.
 
 ### Task 0.4: Extract Parameter Schemas
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Tier 1 and Tier 2 IOP source files
 - **Output:** `schemas/` directory with JSON schema per module
 
@@ -133,7 +133,7 @@ Output as a JSON Schema document.
 
 ### Task 1.1: Create Project Scaffold
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** None
 - **Output:** Directory structure
 
@@ -179,7 +179,7 @@ Create placeholder files and a basic .gitignore for C/CMake projects.
 
 ### Task 1.2: Write Root CMakeLists.txt
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Dependency list
 - **Output:** `CMakeLists.txt`
 
@@ -217,7 +217,7 @@ Include standard CMake best practices (target_include_directories, generator exp
 
 ### Task 1.3: Integrate rawspeed
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** rawspeed repository
 - **Output:** CMake integration
 

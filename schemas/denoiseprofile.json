@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/denoiseprofile",
+  "title": "denoise (profiled)",
+  "description": "denoise using noise statistics profiled on sensors",
+  "type": "object",
+  "version": 12,
+  "properties": {
+    "radius": {
+      "type": "number",
+      "description": "Patch size",
+      "minimum": 0.0,
+      "maximum": 12.0,
+      "default": 1.0
+    },
+    "nbhood": {
+      "type": "number",
+      "description": "Search radius",
+      "minimum": 1.0,
+      "maximum": 30.0,
+      "default": 7.0
+    },
+    "strength": {
+      "type": "number",
+      "description": "Noise level after equalization",
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "default": 1.0
+    },
+    "shadows": {
+      "type": "number",
+      "description": "Preserve shadows",
+      "minimum": 0.0,
+      "maximum": 1.8,
+      "default": 1.0
+    },
+    "bias": {
+      "type": "number",
+      "description": "Bias correction",
+      "minimum": -1000.0,
+      "maximum": 100.0,
+      "default": 0.0
+    },
+    "scattering": {
+      "type": "number",
+      "description": "Scattering (spread search zone)",
+      "minimum": 0.0,
+      "maximum": 20.0,
+      "default": 0.0
+    },
+    "central_pixel_weight": {
+      "type": "number",
+      "description": "Central pixel weight in patch comparison",
+      "minimum": 0.0,
+      "maximum": 10.0,
+      "default": 0.1
+    },
+    "overshooting": {
+      "type": "number",
+      "description": "Adjust autoset parameters",
+      "minimum": 0.001,
+      "maximum": 1000.0,
+      "default": 1.0
+    },
+    "a": {
+      "type": "array",
+      "description": "Poissonian noise coefficient per channel",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "b": {
+      "type": "array",
+      "description": "Gaussian noise coefficient per channel",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "mode": {
+      "type": "integer",
+      "description": "Denoising mode",
+      "enum": [0, 1, 2, 3, 4],
+      "enumDescriptions": ["non-local means", "wavelets", "compute variance", "non-local means auto", "wavelets auto"],
+      "default": 1
+    },
+    "x": {
+      "type": "array",
+      "description": "Wavelet curve X coordinates per channel",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "y": {
+      "type": "array",
+      "description": "Wavelet curve Y coordinates per channel",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "default": 0.5
+    },
+    "wb_adaptive_anscombe": {
+      "type": "boolean",
+      "description": "Whitebalance-adaptive transform",
+      "default": true
+    },
+    "fix_anscombe_and_nlmeans_norm": {
+      "type": "boolean",
+      "description": "Fix various bugs in algorithm",
+      "default": true
+    },
+    "use_new_vst": {
+      "type": "boolean",
+      "description": "Upgrade profiled transform",
+      "default": true
+    },
+    "wavelet_color_mode": {
+      "type": "integer",
+      "description": "Color mode for wavelets",
+      "enum": [0, 1],
+      "enumDescriptions": ["RGB", "Y0U0V0"],
+      "default": 1
+    },
+    "compensate_hilite_pres": {
+      "type": "boolean",
+      "description": "Compensate highlight preservation",
+      "default": true
+    }
+  },
+  "required": ["mode"],
+  "additionalProperties": false
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/rawprepare",
+  "title": "rawprepare",
+  "description": "Sets technical specificities of the raw sensor - black/white point and crop",
+  "type": "object",
+  "version": 2,
+  "properties": {
+    "left": {
+      "type": "integer",
+      "description": "Crop left border",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 0
+    },
+    "top": {
+      "type": "integer",
+      "description": "Crop top border",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 0
+    },
+    "right": {
+      "type": "integer",
+      "description": "Crop right border",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 0
+    },
+    "bottom": {
+      "type": "integer",
+      "description": "Crop bottom border",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 0
+    },
+    "raw_black_level_separate": {
+      "type": "array",
+      "description": "Black level for each CFA channel",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "minItems": 4,
+      "maxItems": 4,
+      "default": [0, 0, 0, 0]
+    },
+    "raw_white_point": {
+      "type": "integer",
+      "description": "White point",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 65535
+    },
+    "flat_field": {
+      "type": "integer",
+      "description": "Flat field correction mode",
+      "enum": [0, 1],
+      "enumDescriptions": ["disabled", "embedded GainMap"],
+      "default": 0
+    }
+  },
+  "required": ["left", "top", "right", "bottom", "raw_black_level_separate", "raw_white_point"],
+  "additionalProperties": false
+}

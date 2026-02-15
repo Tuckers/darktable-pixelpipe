@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/levels",
+  "title": "levels",
+  "description": "attempt to adjust black/white/gray point in Lab space (display-referred, deprecated)",
+  "type": "object",
+  "version": 2,
+  "deprecated": true,
+  "properties": {
+    "mode": {
+      "type": "integer",
+      "description": "Levels mode",
+      "enum": [0, 1],
+      "enumDescriptions": ["manual", "automatic"],
+      "default": 0
+    },
+    "black": {
+      "type": "number",
+      "description": "Black point",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 0.0
+    },
+    "gray": {
+      "type": "number",
+      "description": "Gray point (gamma)",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 50.0
+    },
+    "white": {
+      "type": "number",
+      "description": "White point",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 100.0
+    },
+    "levels": {
+      "type": "array",
+      "description": "Levels array [black, gray, white]",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "required": ["mode"],
+  "additionalProperties": false
+}

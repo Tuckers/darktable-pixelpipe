@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/crop",
+  "title": "crop",
+  "description": "change the framing",
+  "type": "object",
+  "version": 3,
+  "properties": {
+    "cx": {
+      "type": "number",
+      "description": "Left margin (0-1)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "cy": {
+      "type": "number",
+      "description": "Top margin (0-1)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "cw": {
+      "type": "number",
+      "description": "Right margin (0-1)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 1.0
+    },
+    "ch": {
+      "type": "number",
+      "description": "Bottom margin (0-1)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 1.0
+    },
+    "ratio_n": {
+      "type": "integer",
+      "description": "Aspect ratio numerator (-1 = freehand)",
+      "default": -1
+    },
+    "ratio_d": {
+      "type": "integer",
+      "description": "Aspect ratio denominator (-1 = freehand, negative = flipped)",
+      "default": -1
+    }
+  },
+  "required": ["cx", "cy", "cw", "ch"],
+  "additionalProperties": false
+}

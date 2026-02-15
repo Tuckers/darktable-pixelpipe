@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/sharpen",
+  "title": "sharpen",
+  "description": "attempt to sharpen using unsharp mask (display-referred)",
+  "type": "object",
+  "version": 1,
+  "properties": {
+    "radius": {
+      "type": "number",
+      "description": "Blur radius for unsharp mask",
+      "minimum": 0.0,
+      "maximum": 99.0,
+      "default": 2.0
+    },
+    "amount": {
+      "type": "number",
+      "description": "Sharpening amount",
+      "minimum": 0.0,
+      "maximum": 2.0,
+      "default": 0.5
+    },
+    "threshold": {
+      "type": "number",
+      "description": "Threshold to avoid sharpening noise",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 0.5
+    }
+  },
+  "required": ["radius", "amount", "threshold"],
+  "additionalProperties": false
+}

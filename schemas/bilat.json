@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/bilat",
+  "title": "local contrast",
+  "description": "manipulate local and global contrast separately (display-referred)",
+  "type": "object",
+  "version": 3,
+  "properties": {
+    "mode": {
+      "type": "integer",
+      "description": "Filter mode",
+      "enum": [0, 1],
+      "enumDescriptions": ["bilateral grid", "local laplacian filter"],
+      "default": 1
+    },
+    "sigma_r": {
+      "type": "number",
+      "description": "Highlights (local laplacian) / range sigma (bilateral)",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 0.5
+    },
+    "sigma_s": {
+      "type": "number",
+      "description": "Shadows (local laplacian) / spatial sigma (bilateral)",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 0.5
+    },
+    "detail": {
+      "type": "number",
+      "description": "Detail / local contrast",
+      "minimum": -1.0,
+      "maximum": 4.0,
+      "default": 0.25
+    },
+    "midtone": {
+      "type": "number",
+      "description": "Midtone range (local laplacian only)",
+      "minimum": 0.001,
+      "maximum": 1.0,
+      "default": 0.5
+    }
+  },
+  "required": ["mode"],
+  "additionalProperties": false
+}

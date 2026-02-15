@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/colorout",
+  "title": "colorout",
+  "description": "Convert pipeline reference RGB to any display RGB using color profiles to remap RGB values",
+  "type": "object",
+  "version": 5,
+  "properties": {
+    "type": {
+      "type": "integer",
+      "description": "Output color profile type",
+      "default": 1,
+      "enumDescriptions": [
+        "none",
+        "sRGB",
+        "Adobe RGB",
+        "linear Rec709 RGB",
+        "linear Rec2020 RGB",
+        "Lab",
+        "display profile",
+        "file"
+      ]
+    },
+    "filename": {
+      "type": "string",
+      "description": "ICC profile filename",
+      "maxLength": 512,
+      "default": ""
+    },
+    "intent": {
+      "type": "integer",
+      "description": "Rendering intent",
+      "enum": [0, 1, 2, 3],
+      "enumDescriptions": ["perceptual", "relative colorimetric", "saturation", "absolute colorimetric"],
+      "default": 0
+    }
+  },
+  "required": ["type", "intent"],
+  "additionalProperties": false
+}

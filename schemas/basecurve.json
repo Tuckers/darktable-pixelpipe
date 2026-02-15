@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/basecurve",
+  "title": "base curve",
+  "description": "attempt to reproduce the tonality of out-of-camera JPEG (sRGB based, display-referred)",
+  "type": "object",
+  "version": 6,
+  "properties": {
+    "basecurve": {
+      "type": "array",
+      "description": "Curve nodes for each channel (3 channels, up to 20 nodes each)",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "y": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        }
+      }
+    },
+    "basecurve_nodes": {
+      "type": "array",
+      "description": "Number of nodes for each curve channel",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 20
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "default": [0, 0, 0]
+    },
+    "basecurve_type": {
+      "type": "array",
+      "description": "Interpolation type for each curve channel",
+      "items": {
+        "type": "integer",
+        "enum": [0, 1, 2],
+        "enumDescriptions": ["cubic spline", "catmull-rom", "monotone hermite"]
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "default": [2, 2, 2]
+    },
+    "exposure_fusion": {
+      "type": "integer",
+      "description": "Enable exposure fusion",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0
+    },
+    "exposure_stops": {
+      "type": "number",
+      "description": "Exposure difference between bracketed shots",
+      "minimum": 0.01,
+      "maximum": 4.0,
+      "default": 1.0
+    },
+    "exposure_bias": {
+      "type": "number",
+      "description": "Bias for fusion blending",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 1.0
+    },
+    "preserve_colors": {
+      "type": "integer",
+      "description": "Color preservation method",
+      "enum": [0, 1, 2, 3, 4, 5, 6],
+      "enumDescriptions": ["none", "luminance", "max RGB", "average RGB", "sum RGB", "RGB power norm", "per channel"],
+      "default": 1
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

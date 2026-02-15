@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/temperature",
+  "title": "temperature",
+  "description": "Scale raw RGB channels to balance white and help demosaicing",
+  "type": "object",
+  "version": 4,
+  "properties": {
+    "red": {
+      "type": "number",
+      "description": "Red channel multiplier",
+      "minimum": 0.0,
+      "maximum": 8.0,
+      "default": 1.0
+    },
+    "green": {
+      "type": "number",
+      "description": "Green channel multiplier",
+      "minimum": 0.0,
+      "maximum": 8.0,
+      "default": 1.0
+    },
+    "blue": {
+      "type": "number",
+      "description": "Blue channel multiplier",
+      "minimum": 0.0,
+      "maximum": 8.0,
+      "default": 1.0
+    },
+    "various": {
+      "type": "number",
+      "description": "Fourth channel multiplier (for 4-bayer sensors)",
+      "minimum": 0.0,
+      "maximum": 8.0,
+      "default": 1.0
+    },
+    "preset": {
+      "type": "integer",
+      "description": "White balance preset mode",
+      "enum": [-1, 0, 1, 2, 3, 4],
+      "enumDescriptions": ["unknown", "as shot", "spot", "user defined", "camera reference (D65)", "as shot to reference (D65 late)"],
+      "default": 0
+    }
+  },
+  "required": ["red", "green", "blue"],
+  "additionalProperties": false
+}

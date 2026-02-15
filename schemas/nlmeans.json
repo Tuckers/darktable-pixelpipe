@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/nlmeans",
+  "title": "astrophoto denoise",
+  "description": "apply poisson noise removal best suited for astrophotography (display-referred)",
+  "type": "object",
+  "version": 2,
+  "properties": {
+    "radius": {
+      "type": "number",
+      "description": "Patch size",
+      "minimum": 0.0,
+      "maximum": 10.0,
+      "default": 2.0
+    },
+    "strength": {
+      "type": "number",
+      "description": "Strength",
+      "minimum": 0.0,
+      "maximum": 100000.0,
+      "default": 50.0
+    },
+    "luma": {
+      "type": "number",
+      "description": "How much to smooth brightness",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.5
+    },
+    "chroma": {
+      "type": "number",
+      "description": "How much to smooth colors",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 1.0
+    }
+  },
+  "required": ["radius", "strength", "luma", "chroma"],
+  "additionalProperties": false
+}

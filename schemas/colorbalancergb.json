@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/colorbalancergb",
+  "title": "color balance rgb",
+  "description": "attempt to lift/gamma/gain control in scene-referred RGB with perceptually-uniform color manipulation",
+  "type": "object",
+  "version": 5,
+  "properties": {
+    "shadows_Y": {
+      "type": "number",
+      "description": "Shadows luminance adjustment",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "shadows_C": {
+      "type": "number",
+      "description": "Shadows chroma adjustment",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "shadows_H": {
+      "type": "number",
+      "description": "Shadows hue angle",
+      "minimum": 0.0,
+      "maximum": 360.0,
+      "default": 0.0
+    },
+    "midtones_Y": {
+      "type": "number",
+      "description": "Midtones luminance adjustment",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "midtones_C": {
+      "type": "number",
+      "description": "Midtones chroma adjustment",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "midtones_H": {
+      "type": "number",
+      "description": "Midtones hue angle",
+      "minimum": 0.0,
+      "maximum": 360.0,
+      "default": 0.0
+    },
+    "highlights_Y": {
+      "type": "number",
+      "description": "Highlights luminance adjustment",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "highlights_C": {
+      "type": "number",
+      "description": "Highlights chroma adjustment",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "highlights_H": {
+      "type": "number",
+      "description": "Highlights hue angle",
+      "minimum": 0.0,
+      "maximum": 360.0,
+      "default": 0.0
+    },
+    "global_Y": {
+      "type": "number",
+      "description": "Global luminance adjustment",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "global_C": {
+      "type": "number",
+      "description": "Global chroma adjustment",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "global_H": {
+      "type": "number",
+      "description": "Global hue angle",
+      "minimum": 0.0,
+      "maximum": 360.0,
+      "default": 0.0
+    },
+    "shadows_weight": {
+      "type": "number",
+      "description": "Shadows mask center",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "white_fulcrum": {
+      "type": "number",
+      "description": "White fulcrum for chroma grading",
+      "minimum": -10.0,
+      "maximum": 10.0,
+      "default": 0.0
+    },
+    "highlights_weight": {
+      "type": "number",
+      "description": "Highlights mask center",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "chroma_shadows": {
+      "type": "number",
+      "description": "Shadows chroma grading",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "chroma_highlights": {
+      "type": "number",
+      "description": "Highlights chroma grading",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "chroma_global": {
+      "type": "number",
+      "description": "Global chroma grading",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "chroma_midtones": {
+      "type": "number",
+      "description": "Midtones chroma grading",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "saturation_global": {
+      "type": "number",
+      "description": "Global saturation",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "saturation_highlights": {
+      "type": "number",
+      "description": "Highlights saturation",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "saturation_midtones": {
+      "type": "number",
+      "description": "Midtones saturation",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "saturation_shadows": {
+      "type": "number",
+      "description": "Shadows saturation",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "hue_angle": {
+      "type": "number",
+      "description": "Hue shift angle",
+      "minimum": -180.0,
+      "maximum": 180.0,
+      "default": 0.0
+    },
+    "brilliance_global": {
+      "type": "number",
+      "description": "Global brilliance",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "brilliance_highlights": {
+      "type": "number",
+      "description": "Highlights brilliance",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "brilliance_midtones": {
+      "type": "number",
+      "description": "Midtones brilliance",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "brilliance_shadows": {
+      "type": "number",
+      "description": "Shadows brilliance",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "mask_grey_fulcrum": {
+      "type": "number",
+      "description": "Gray fulcrum for mask",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.1845
+    },
+    "vibrance": {
+      "type": "number",
+      "description": "Vibrance",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "grey_fulcrum": {
+      "type": "number",
+      "description": "Gray fulcrum for contrast",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.1845
+    },
+    "contrast": {
+      "type": "number",
+      "description": "Contrast",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "saturation_formula": {
+      "type": "integer",
+      "description": "Saturation formula version",
+      "enum": [0, 1],
+      "enumDescriptions": ["JzAzBz (2021)", "darktable UCS (2022)"],
+      "default": 1
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

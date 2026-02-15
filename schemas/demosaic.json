@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/demosaic",
+  "title": "demosaic",
+  "description": "Reconstruct full RGB pixels from a sensor color filter array reading",
+  "type": "object",
+  "version": 6,
+  "properties": {
+    "green_eq": {
+      "type": "integer",
+      "description": "Match greens method",
+      "enum": [0, 1, 2, 3],
+      "enumDescriptions": ["disabled", "local average", "full average", "full and local average"],
+      "default": 0
+    },
+    "median_thrs": {
+      "type": "number",
+      "description": "Edge threshold for median filter",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "color_smoothing": {
+      "type": "integer",
+      "description": "Color smoothing iterations",
+      "enum": [0, 1, 2, 3, 4, 5],
+      "enumDescriptions": ["disabled", "once", "twice", "three times", "four times", "five times"],
+      "default": 0
+    },
+    "demosaicing_method": {
+      "type": "integer",
+      "description": "Demosaicing algorithm",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 7, 1024, 1025, 1026, 1028, 1027, 1029, 2053, 2049, 3074],
+      "enumDescriptions": [
+        "PPG",
+        "AMaZE",
+        "VNG4",
+        "passthrough (monochrome)",
+        "photosite color (debug)",
+        "RCD",
+        "LMMSE",
+        "Monochrome",
+        "VNG (X-Trans)",
+        "Markesteijn 1-pass",
+        "Markesteijn 3-pass",
+        "frequency domain chroma",
+        "passthrough monochrome (X-Trans)",
+        "photosite color (X-Trans debug)",
+        "RCD (dual)",
+        "AMaZE (dual)",
+        "Markesteijn 3-pass (dual)"
+      ],
+      "default": 5
+    },
+    "lmmse_refine": {
+      "type": "integer",
+      "description": "LMMSE refinement level",
+      "enum": [0, 1, 2, 3, 4],
+      "enumDescriptions": ["basic", "median", "3x median", "refine & medians", "2x refine + medians"],
+      "default": 1
+    },
+    "dual_thrs": {
+      "type": "number",
+      "description": "Dual demosaicing threshold",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.2
+    },
+    "cs_radius": {
+      "type": "number",
+      "description": "Capture sharpen radius",
+      "minimum": 0.0,
+      "maximum": 1.5,
+      "default": 0.0
+    },
+    "cs_thrs": {
+      "type": "number",
+      "description": "Capture sharpen contrast sensitivity",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.4
+    },
+    "cs_boost": {
+      "type": "number",
+      "description": "Capture sharpen corner boost",
+      "minimum": 0.0,
+      "maximum": 1.5,
+      "default": 0.0
+    },
+    "cs_iter": {
+      "type": "integer",
+      "description": "Capture sharpen iterations",
+      "minimum": 1,
+      "maximum": 25,
+      "default": 8
+    },
+    "cs_center": {
+      "type": "number",
+      "description": "Capture sharpen center",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "cs_enabled": {
+      "type": "boolean",
+      "description": "Enable capture sharpening",
+      "default": false
+    }
+  },
+  "required": ["demosaicing_method"],
+  "additionalProperties": false
+}

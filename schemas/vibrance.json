@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/vibrance",
+  "title": "vibrance",
+  "description": "attempt to boost saturation on muted colors more than on saturated colors (display-referred, deprecated)",
+  "type": "object",
+  "version": 2,
+  "deprecated": true,
+  "properties": {
+    "amount": {
+      "type": "number",
+      "description": "Vibrance amount",
+      "minimum": 0.0,
+      "maximum": 100.0,
+      "default": 25.0
+    }
+  },
+  "required": ["amount"],
+  "additionalProperties": false
+}

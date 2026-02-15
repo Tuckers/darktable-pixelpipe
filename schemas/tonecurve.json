@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/tonecurve",
+  "title": "tone curve",
+  "description": "attempt to control tonality using Lab-based curve adjustment (display-referred)",
+  "type": "object",
+  "version": 5,
+  "properties": {
+    "tonecurve": {
+      "type": "array",
+      "description": "Curve nodes for L, a, b channels (up to 20 nodes each)",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "y": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        }
+      }
+    },
+    "tonecurve_nodes": {
+      "type": "array",
+      "description": "Number of nodes for each curve channel",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 20
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "tonecurve_type": {
+      "type": "array",
+      "description": "Interpolation type for each curve channel",
+      "items": {
+        "type": "integer",
+        "enum": [0, 1, 2],
+        "enumDescriptions": ["cubic spline", "catmull-rom", "monotone hermite"]
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "default": [2, 2, 2]
+    },
+    "tonecurve_autoscale_ab": {
+      "type": "integer",
+      "description": "Auto-scale method for a/b channels",
+      "enum": [0, 1, 2, 3],
+      "enumDescriptions": ["manual", "automatic", "automatic (XYZ)", "automatic (RGB)"],
+      "default": 3
+    },
+    "tonecurve_preset": {
+      "type": "integer",
+      "description": "Preset index",
+      "default": 0
+    },
+    "tonecurve_unbound_ab": {
+      "type": "integer",
+      "description": "Allow unbound a/b output values",
+      "default": 1
+    },
+    "preserve_colors": {
+      "type": "integer",
+      "description": "Color preservation method",
+      "enum": [0, 1, 2, 3, 4, 5, 6],
+      "enumDescriptions": ["none", "luminance", "max RGB", "average RGB", "sum RGB", "RGB power norm", "per channel"],
+      "default": 3
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

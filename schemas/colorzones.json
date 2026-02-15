@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/colorzones",
+  "title": "color zones",
+  "description": "attempt to selectively adjust colors based on hue, lightness, or saturation",
+  "type": "object",
+  "version": 5,
+  "properties": {
+    "channel": {
+      "type": "integer",
+      "description": "Selection channel (select by)",
+      "enum": [0, 1, 2],
+      "enumDescriptions": ["lightness", "saturation", "hue"],
+      "default": 2
+    },
+    "curve": {
+      "type": "array",
+      "description": "Curve nodes for each output channel (lightness, saturation, hue)",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "y": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "maxItems": 32
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "curve_num_nodes": {
+      "type": "array",
+      "description": "Number of nodes for each curve",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 32
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "curve_type": {
+      "type": "array",
+      "description": "Interpolation type for each curve",
+      "items": {
+        "type": "integer",
+        "enum": [0, 1, 2],
+        "enumDescriptions": ["cubic spline", "catmull-rom", "monotone hermite"]
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "strength": {
+      "type": "number",
+      "description": "Effect mix/strength",
+      "minimum": -200.0,
+      "maximum": 200.0,
+      "default": 0.0
+    },
+    "mode": {
+      "type": "integer",
+      "description": "Processing mode",
+      "enum": [0, 1],
+      "enumDescriptions": ["smooth", "strong"],
+      "default": 0
+    },
+    "splines_version": {
+      "type": "integer",
+      "description": "Splines version",
+      "default": 0
+    }
+  },
+  "required": ["channel"],
+  "additionalProperties": false
+}

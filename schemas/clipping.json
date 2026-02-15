@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/clipping",
+  "title": "crop and rotate",
+  "description": "change the framing and correct the perspective (deprecated - use crop, orientation, and rotate and perspective modules instead)",
+  "type": "object",
+  "version": 5,
+  "deprecated": true,
+  "properties": {
+    "angle": {
+      "type": "number",
+      "description": "Rotation angle (degrees)",
+      "minimum": -180.0,
+      "maximum": 180.0,
+      "default": 0.0
+    },
+    "cx": {
+      "type": "number",
+      "description": "Left margin (0-1)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "cy": {
+      "type": "number",
+      "description": "Top margin (0-1)",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "cw": {
+      "type": "number",
+      "description": "Right margin (0-1, negative = flip horizontal)",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 1.0
+    },
+    "ch": {
+      "type": "number",
+      "description": "Bottom margin (0-1, negative = flip vertical)",
+      "minimum": -1.0,
+      "maximum": 1.0,
+      "default": 1.0
+    },
+    "k_h": {
+      "type": "number",
+      "description": "Horizontal keystone correction",
+      "default": 0.0
+    },
+    "k_v": {
+      "type": "number",
+      "description": "Vertical keystone correction",
+      "default": 0.0
+    },
+    "kxa": {
+      "type": "number",
+      "description": "Keystone point A x",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.2
+    },
+    "kya": {
+      "type": "number",
+      "description": "Keystone point A y",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.2
+    },
+    "kxb": {
+      "type": "number",
+      "description": "Keystone point B x",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.8
+    },
+    "kyb": {
+      "type": "number",
+      "description": "Keystone point B y",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.2
+    },
+    "kxc": {
+      "type": "number",
+      "description": "Keystone point C x",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.8
+    },
+    "kyc": {
+      "type": "number",
+      "description": "Keystone point C y",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.8
+    },
+    "kxd": {
+      "type": "number",
+      "description": "Keystone point D x",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.2
+    },
+    "kyd": {
+      "type": "number",
+      "description": "Keystone point D y",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.8
+    },
+    "k_type": {
+      "type": "integer",
+      "description": "Keystone type",
+      "default": 0
+    },
+    "k_sym": {
+      "type": "integer",
+      "description": "Keystone symmetry",
+      "default": 0
+    },
+    "k_apply": {
+      "type": "integer",
+      "description": "Apply keystone correction",
+      "default": 0
+    },
+    "crop_auto": {
+      "type": "boolean",
+      "description": "Automatic cropping",
+      "default": true
+    },
+    "ratio_n": {
+      "type": "integer",
+      "description": "Aspect ratio numerator (-1 = freehand)",
+      "default": -1
+    },
+    "ratio_d": {
+      "type": "integer",
+      "description": "Aspect ratio denominator (-1 = freehand)",
+      "default": -1
+    }
+  },
+  "required": ["cx", "cy", "cw", "ch"],
+  "additionalProperties": false
+}

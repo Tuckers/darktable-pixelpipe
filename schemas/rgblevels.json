@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/rgblevels",
+  "title": "rgb levels",
+  "description": "attempt to adjust black/white/gray point in RGB space",
+  "type": "object",
+  "version": 1,
+  "properties": {
+    "autoscale": {
+      "type": "integer",
+      "description": "Channel linking mode",
+      "enum": [0, 1],
+      "enumDescriptions": ["independent channels", "linked channels"],
+      "default": 1
+    },
+    "preserve_colors": {
+      "type": "integer",
+      "description": "Color preservation method",
+      "enum": [0, 1, 2, 3, 4, 5, 6],
+      "enumDescriptions": ["none", "luminance", "max RGB", "average RGB", "sum RGB", "RGB power norm", "per channel"],
+      "default": 1
+    },
+    "levels": {
+      "type": "array",
+      "description": "Levels array [R, G, B] x [black, gray, white]",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "minItems": 3,
+        "maxItems": 3
+      },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "required": ["autoscale"],
+  "additionalProperties": false
+}

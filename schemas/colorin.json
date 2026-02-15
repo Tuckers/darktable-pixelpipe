@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/colorin",
+  "title": "colorin",
+  "description": "Convert any RGB input to pipeline reference RGB using color profiles to remap RGB values",
+  "type": "object",
+  "version": 7,
+  "properties": {
+    "type": {
+      "type": "integer",
+      "description": "Input color profile type",
+      "default": 6,
+      "enumDescriptions": [
+        "none",
+        "sRGB",
+        "Adobe RGB",
+        "linear Rec709 RGB",
+        "linear Rec2020 RGB",
+        "Lab",
+        "enhanced matrix",
+        "embedded ICC",
+        "embedded matrix",
+        "standard matrix",
+        "vendor matrix",
+        "alternate matrix",
+        "XYZ",
+        "infrared",
+        "file"
+      ]
+    },
+    "filename": {
+      "type": "string",
+      "description": "ICC profile filename",
+      "maxLength": 512,
+      "default": ""
+    },
+    "intent": {
+      "type": "integer",
+      "description": "Rendering intent",
+      "enum": [0, 1, 2, 3],
+      "enumDescriptions": ["perceptual", "relative colorimetric", "saturation", "absolute colorimetric"],
+      "default": 0
+    },
+    "normalize": {
+      "type": "integer",
+      "description": "Gamut clipping method",
+      "enum": [0, 1, 2, 3, 4],
+      "enumDescriptions": ["off", "sRGB", "Adobe RGB (compatible)", "linear Rec709 RGB", "linear Rec2020 RGB"],
+      "default": 0
+    },
+    "blue_mapping": {
+      "type": "boolean",
+      "description": "Apply blue channel mapping for legacy processing",
+      "default": false
+    },
+    "type_work": {
+      "type": "integer",
+      "description": "Working color profile type",
+      "default": 4
+    },
+    "filename_work": {
+      "type": "string",
+      "description": "Working profile filename",
+      "maxLength": 512,
+      "default": ""
+    }
+  },
+  "required": ["type", "intent"],
+  "additionalProperties": false
+}

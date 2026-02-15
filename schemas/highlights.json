@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/highlights",
+  "title": "highlights",
+  "description": "Avoid magenta highlights and try to recover highlight colors",
+  "type": "object",
+  "version": 4,
+  "properties": {
+    "mode": {
+      "type": "integer",
+      "description": "Highlight reconstruction method",
+      "enum": [0, 1, 2, 3, 4, 5],
+      "enumDescriptions": ["clip highlights", "reconstruct in LCh", "reconstruct color", "guided laplacians", "segmentation based", "inpaint opposed"],
+      "default": 5
+    },
+    "blendL": {
+      "type": "number",
+      "description": "Blend luminance (unused)",
+      "default": 1.0
+    },
+    "blendC": {
+      "type": "number",
+      "description": "Blend chroma (unused)",
+      "default": 0.0
+    },
+    "strength": {
+      "type": "number",
+      "description": "Reconstruction strength",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    },
+    "clip": {
+      "type": "number",
+      "description": "Clipping threshold",
+      "minimum": 0.0,
+      "maximum": 2.0,
+      "default": 1.0
+    },
+    "noise_level": {
+      "type": "number",
+      "description": "Noise level for reconstruction",
+      "minimum": 0.0,
+      "maximum": 0.5,
+      "default": 0.0
+    },
+    "iterations": {
+      "type": "integer",
+      "description": "Number of iterations for guided laplacian",
+      "minimum": 1,
+      "maximum": 256,
+      "default": 30
+    },
+    "scales": {
+      "type": "integer",
+      "description": "Diameter of reconstruction (wavelet scales)",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      "enumDescriptions": ["2 px", "4 px", "8 px", "16 px", "32 px", "64 px", "128 px (slow)", "256 px (slow)", "512 px (very slow)", "1024 px (very slow)", "2048 px (insanely slow)", "4096 px (insanely slow)"],
+      "default": 6
+    },
+    "candidating": {
+      "type": "number",
+      "description": "Candidating threshold for segmentation",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.4
+    },
+    "combine": {
+      "type": "number",
+      "description": "Combine closely related clipped segments",
+      "minimum": 0.0,
+      "maximum": 8.0,
+      "default": 2.0
+    },
+    "recovery": {
+      "type": "integer",
+      "description": "Rebuild mode for segmentation",
+      "enum": [0, 1, 2, 3, 4, 5, 6],
+      "enumDescriptions": ["off", "small segments", "large segments", "flat small segments", "flat large segments", "generic", "flat generic"],
+      "default": 0
+    },
+    "solid_color": {
+      "type": "number",
+      "description": "Inpaint a flat color",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.0
+    }
+  },
+  "required": ["mode", "clip"],
+  "additionalProperties": false
+}

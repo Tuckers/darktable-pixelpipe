@@ -1,0 +1,38 @@
+# Build directories
+build/
+build-*/
+_build/
+out/
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+*.cmake.user
+
+# Compiled objects and libraries
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Node.js addon
+node/build/
+node/node_modules/
+*.node
+
+# Editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test output
+Testing/
+*.log

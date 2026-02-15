@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "darktable/iop/channelmixerrgb",
+  "title": "color calibration",
+  "description": "attempt to adjust color channels using matrix multiplication and chromatic adaptation",
+  "type": "object",
+  "version": 3,
+  "properties": {
+    "red": {
+      "type": "array",
+      "description": "Red channel mixing coefficients [R, G, B, +const, -const]",
+      "items": {
+        "type": "number",
+        "minimum": -2.0,
+        "maximum": 2.0
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "green": {
+      "type": "array",
+      "description": "Green channel mixing coefficients [R, G, B, +const, -const]",
+      "items": {
+        "type": "number",
+        "minimum": -2.0,
+        "maximum": 2.0
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "blue": {
+      "type": "array",
+      "description": "Blue channel mixing coefficients [R, G, B, +const, -const]",
+      "items": {
+        "type": "number",
+        "minimum": -2.0,
+        "maximum": 2.0
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "saturation": {
+      "type": "array",
+      "description": "Saturation coefficients [R, G, B, in, out]",
+      "items": {
+        "type": "number",
+        "minimum": -2.0,
+        "maximum": 2.0
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "lightness": {
+      "type": "array",
+      "description": "Lightness coefficients [R, G, B, in, out]",
+      "items": {
+        "type": "number",
+        "minimum": -2.0,
+        "maximum": 2.0
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "grey": {
+      "type": "array",
+      "description": "Grayscale conversion coefficients [R, G, B, in, out]",
+      "items": {
+        "type": "number",
+        "minimum": -2.0,
+        "maximum": 2.0
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "normalize_R": {
+      "type": "boolean",
+      "description": "Normalize red output",
+      "default": true
+    },
+    "normalize_G": {
+      "type": "boolean",
+      "description": "Normalize green output",
+      "default": true
+    },
+    "normalize_B": {
+      "type": "boolean",
+      "description": "Normalize blue output",
+      "default": true
+    },
+    "normalize_sat": {
+      "type": "boolean",
+      "description": "Normalize saturation output",
+      "default": true
+    },
+    "normalize_light": {
+      "type": "boolean",
+      "description": "Normalize lightness output",
+      "default": true
+    },
+    "normalize_grey": {
+      "type": "boolean",
+      "description": "Normalize grayscale output",
+      "default": true
+    },
+    "illuminant": {
+      "type": "integer",
+      "description": "Illuminant type for chromatic adaptation",
+      "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "enumDescriptions": [
+        "same as pipeline (D50)",
+        "A (incandescent)",
+        "D (daylight)",
+        "E (equi-energy)",
+        "F (fluorescent)",
+        "LED",
+        "Planckian (black body)",
+        "custom",
+        "(test) camera",
+        "detect from edges",
+        "detect from surfaces",
+        "as shot in EXIF",
+        "from reference spot"
+      ],
+      "default": 2
+    },
+    "adaptation": {
+      "type": "integer",
+      "description": "Chromatic adaptation transform",
+      "enum": [0, 1, 2, 3, 4],
+      "enumDescriptions": ["linear Bradford", "CAT16", "non-linear Bradford", "XYZ", "RGB (none)"],
+      "default": 1
+    },
+    "x": {
+      "type": "number",
+      "description": "Illuminant chromaticity x",
+      "default": 0.333
+    },
+    "y": {
+      "type": "number",
+      "description": "Illuminant chromaticity y",
+      "default": 0.333
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Illuminant color temperature (K)",
+      "minimum": 1667.0,
+      "maximum": 25000.0,
+      "default": 5003.0
+    },
+    "gamut": {
+      "type": "number",
+      "description": "Gamut compression amount",
+      "minimum": 0.0,
+      "maximum": 12.0,
+      "default": 1.0
+    },
+    "clip": {
+      "type": "boolean",
+      "description": "Clip negative RGB values",
+      "default": true
+    },
+    "version": {
+      "type": "integer",
+      "description": "Module version",
+      "enum": [0, 1, 2, 3],
+      "enumDescriptions": ["v1 (2020)", "v2 (2021)", "v3 (2021)", "v4 (2022)"],
+      "default": 3
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
