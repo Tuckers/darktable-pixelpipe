@@ -56,7 +56,9 @@ libdtpipe/
     ├── test_history_roundtrip.c  # Task 5.2: JSON serialize/deserialize round-trip
     ├── test_history_deserialize.c # Task 5.3: JSON deserialization tests
     ├── test_xmp_read.c           # Task 5.4: XMP reading tests
-    └── test_xmp_write.c          # Task 5.5: XMP writing tests
+    ├── test_xmp_write.c          # Task 5.5: XMP writing tests
+    ├── test_main.c               # Task 7.1: Unified test harness (all suites)
+    └── benchmark_performance.c   # Performance benchmark (all pipeline stages)
 ```
 
 ---
@@ -129,13 +131,19 @@ cp -r libdtpipe/build/share libdtpipe/build-release/
 - 5.4 Implement XMP Reading (`src/history/xmp_read.cc`) — ✅ Complete
 - 5.5 Implement XMP Writing (`src/history/xmp_write.cc`) — ✅ Complete
 
-### Phase 6: Node.js Addon — 🔄 In Progress
+### Phase 6: Node.js Addon — ✅ Complete
 - 6.1 Create Addon Scaffold (`node/` directory, binding.gyp, empty addon.cc) — ✅ Complete
 - 6.2 Wrap Image Loading (`Image` class, `loadRaw()`) — ✅ Complete
 - 6.3 Wrap Pipeline Operations (`Pipeline` class, `createPipeline()`) — ✅ Complete
 - 6.4 Wrap Render (`Pipeline.render()`, `Pipeline.renderRegion()`, `RenderResult` class) — ✅ Complete
 - 6.5 Wrap Export (`Pipeline.exportJpeg()`, `Pipeline.exportPng()`, `Pipeline.exportTiff()`, history/XMP methods) — ✅ Complete
 - 6.6 TypeScript Declarations (`node/types/index.d.ts`) — ✅ Complete
+
+### Phase 7: Testing — 🔄 In Progress
+- 7.1 Create C Test Harness (`tests/test_main.c`) — ✅ Complete
+- 7.2 Create Reference Renders — ⬜ Not Started
+- 7.3 Implement Regression Tests — ⬜ Not Started
+- 7.4 Write Node.js Tests — ⬜ Not Started
 
 ---
 
@@ -234,6 +242,11 @@ History/XMP methods are synchronous (fast): `serializeHistory()` returns a JSON 
 
 ### TypeScript declarations (`node/types/index.d.ts` — Task 6.6)
 Full `export declare` declarations for `Image`, `Pipeline`, `RenderResult`, `loadRaw()`, and `createPipeline()`. Uses `ArrayBuffer` (not `SharedArrayBuffer`) for `RenderResult.buffer` to match the actual `Napi::ArrayBuffer` implementation. The `package.json` `"types"` field points to this file. Verified with `tsc --strict --noEmit` via a `tsconfig.json` with `paths: { "@app/dtpipe": ["types/index.d.ts"] }`.
+
+### Unified test harness (`tests/test_main.c` — Task 7.1)
+Single-binary test runner covering all six API surface areas: `test_init`, `test_load`, `test_pipeline`, `test_render`, `test_export`, `test_history`. Uses a minimal inline `CHECK`/`CHECK_EQ_INT`/`SKIP` macro framework — no third-party test library. 99 checks, 0 failures against the test RAF. Registered in CMake as `test_main` with a 300s timeout (export tests are slow at full resolution). Two important test design notes:
+- `dtpipe_init()` uses `pthread_once` internally, so a second call returns `DTPIPE_OK` (not `DTPIPE_ERR_ALREADY_INIT`); the test accepts either.
+- With all IOP modules having stub `process_plain=NULL`, rendered pixel alpha is 0 (raw sensor passthrough); the render tests verify dimensions and no-crash rather than exact pixel values.
 
 ### Parameter descriptor tables (`pipe/params.h/.c`)
 Each IOP's params struct is described by a static `dt_param_desc_t[]` array

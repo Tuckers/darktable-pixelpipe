@@ -2,6 +2,26 @@ enable_testing()
 
 set(RAF_PATH "${CMAKE_SOURCE_DIR}/../test-image/DSCF4379.RAF")
 
+# ── Task 7.1: Unified test harness ────────────────────────────────────────────
+
+add_executable(test_main
+  test_main.c
+)
+
+target_link_libraries(test_main PRIVATE dtpipe m)
+
+target_include_directories(test_main PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_test(
+  NAME    test_main
+  COMMAND test_main "${RAF_PATH}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+set_tests_properties(test_main PROPERTIES TIMEOUT 300)
+
 # ── Performance benchmark ──────────────────────────────────────────────────────
 
 add_executable(benchmark_performance
