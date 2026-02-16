@@ -1,6 +1,7 @@
 enable_testing()
 
 set(RAF_PATH "${CMAKE_SOURCE_DIR}/../test-image/DSCF4379.RAF")
+set(REFERENCE_DIR "${CMAKE_SOURCE_DIR}/tests/reference")
 
 # ── Task 7.1: Unified test harness ────────────────────────────────────────────
 
@@ -21,6 +22,32 @@ add_test(
 )
 
 set_tests_properties(test_main PROPERTIES TIMEOUT 300)
+
+# ── Task 7.2: Reference render generator ─────────────────────────────────────
+#
+# NOT a ctest test — run once manually (or via `cmake --build . --target generate_reference`)
+# to establish the ground-truth renders used by Task 7.3 regression tests.
+#
+#   cmake --build libdtpipe/build-release --target generate_reference
+#
+# Output: libdtpipe/tests/reference/{preset_a,preset_b,preset_c}.{png,json} + metadata.txt
+
+add_executable(gen_reference
+  gen_reference.c
+)
+
+target_link_libraries(gen_reference PRIVATE dtpipe m)
+
+target_include_directories(gen_reference PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_custom_target(generate_reference
+  COMMAND gen_reference "${RAF_PATH}" "${REFERENCE_DIR}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+  DEPENDS gen_reference
+  COMMENT "Generating reference renders to ${REFERENCE_DIR}"
+)
 
 # ── Performance benchmark ──────────────────────────────────────────────────────
 

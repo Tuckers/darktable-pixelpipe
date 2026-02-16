@@ -1485,7 +1485,7 @@ Make tests runnable via: ./build/tests/test_main
 
 ### Task 7.2: Create Reference Renders
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Test RAW files
 - **Output:** `tests/reference/` directory
 
