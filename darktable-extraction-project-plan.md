@@ -414,7 +414,13 @@ For each module:
 4. Output cleaned source
 ```
 
-**Verification:** All Tier 2 modules compile. Create tracking checklist.
+**Verification:** All 17 present Tier 2 modules scanned clean of GUI tokens. Manual fixes applied to 4 modules where strip_iop.py missed residual GUI functions:
+- basecurve.c: removed `dt_iop_basecurve_motion_notify` and `_move_point_internal` (mouse canvas handlers with non-`gui_` prefix)
+- crop.c: removed `_commit_box`, `_gui_get_grab`, `button_released`, `mouse_actions`
+- clipping.c: removed `get_grab`, `mouse_actions`
+- channelmixerrgb.c: removed `_extract_patches` and its `extraction_result_t` typedef (color checker patch extraction using gui_data struct)
+
+Note: Full compilation verification requires stub headers from Phase 3.
 
 ---
 

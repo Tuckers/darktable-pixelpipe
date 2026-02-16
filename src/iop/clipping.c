@@ -1310,41 +1310,6 @@ static gint _aspect_ratio_cmp(const dt_iop_clipping_aspect_t *a, const dt_iop_cl
 }
 
 
-static _grab_region_t get_grab(const float pzx, const float pzy, const dt_iop_clipping_gui_data_t *g, const float border,
-                               const float wd, const float ht)
-{
-  _grab_region_t grab = GRAB_NONE;
-  if(!(pzx < g->clip_x || pzx > g->clip_x + g->clip_w || pzy < g->clip_y || pzy > g->clip_y + g->clip_h))
-  {
-    // we are inside the crop box
-    grab = GRAB_CENTER;
-    if(pzx >= g->clip_x && pzx * wd < g->clip_x * wd + border) grab |= GRAB_LEFT; // left border
-    if(pzy >= g->clip_y && pzy * ht < g->clip_y * ht + border) grab |= GRAB_TOP;  // top border
-    if(pzx <= g->clip_x + g->clip_w && pzx * wd > (g->clip_w + g->clip_x) * wd - border)
-      grab |= GRAB_RIGHT; // right border
-    if(pzy <= g->clip_y + g->clip_h && pzy * ht > (g->clip_h + g->clip_y) * ht - border)
-      grab |= GRAB_BOTTOM; // bottom border
-  }
-  return grab;
-}
-
-// draw symmetry signs
-
-// draw guides and handles over the image
-
-// determine the distance between the segment [(xa,ya)(xb,yb)] and the point (xc,yc)
-
-
-GSList *mouse_actions(dt_iop_module_t *self)
-{
-  GSList *lm = NULL;
-  lm = dt_mouse_action_create_format(lm, DT_MOUSE_ACTION_LEFT_DRAG, 0, _("[%s on borders] crop"), self->name());
-  lm = dt_mouse_action_create_format(lm, DT_MOUSE_ACTION_LEFT_DRAG, GDK_SHIFT_MASK,
-                                     _("[%s on borders] crop keeping ratio"), self->name());
-  lm = dt_mouse_action_create_format(lm, DT_MOUSE_ACTION_RIGHT_DRAG, 0, _("[%s] define/rotate horizon"), self->name());
-  return lm;
-}
-
 #undef PHI
 #undef INVPHI
 
