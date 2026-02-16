@@ -1,5 +1,7 @@
 set(DTPIPE_SOURCES
   init.c
+  common/iop_order.c
+  pipe/pixelpipe.c
 )
 
 add_library(dtpipe SHARED ${DTPIPE_SOURCES})
@@ -12,6 +14,7 @@ target_include_directories(dtpipe
     $<INSTALL_INTERFACE:include>
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/pipe
 )
 
 # ── Language standard ─────────────────────────────────────────────────────────

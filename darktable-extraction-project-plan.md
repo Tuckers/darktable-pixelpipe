@@ -430,9 +430,9 @@ Note: Full compilation verification requires stub headers from Phase 3.
 
 ### Task 3.1: Write Minimal darktable.h
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Original darktable headers
-- **Output:** `include/dtpipe_internal.h`
+- **Output:** `libdtpipe/src/dtpipe_internal.h`
 
 **Claude Code Prompt:**
 ```
@@ -474,7 +474,7 @@ Use C11 standard types (stdint.h, stdbool.h).
 
 ### Task 3.2: Implement dtpipe_init()
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Initialization requirements
 - **Output:** `src/init.c`
 
@@ -516,7 +516,7 @@ Use thread-safe initialization (call_once or similar).
 
 ### Task 3.3: Port iop_order.c
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** darktable `src/common/iop_order.c`
 - **Output:** `src/common/iop_order.c` (ported)
 
@@ -559,7 +559,7 @@ Input: [paste original iop_order.c and iop_order.h]
 
 ### Task 3.4: Port pixelpipe_hb.c (Part 1 - Structures)
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** darktable `src/develop/pixelpipe_hb.c`
 - **Output:** `src/pipe/pixelpipe.c` (partial)
 
@@ -599,7 +599,7 @@ Input: [paste relevant sections of pixelpipe_hb.c and headers]
 
 ### Task 3.5: Port pixelpipe_hb.c (Part 2 - Processing)
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete & Verified
 - **Input:** pixelpipe_hb.c processing functions
 - **Output:** `src/pipe/pixelpipe.c` (complete)
 
@@ -639,6 +639,13 @@ Input: [paste processing sections of pixelpipe_hb.c]
 ```
 
 **Verification:** Can process a simple test image through minimal pipeline.
+
+**To run the test:**
+```bash
+cmake -S libdtpipe -B build-check -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-check
+cd build-check && ctest --output-on-failure
+```
 
 ---
 
