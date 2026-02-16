@@ -337,3 +337,241 @@ console.log("\nAll task 6.3 checks passed.");
   console.error("Unhandled error in async test:", err);
   process.exit(1);
 });
+
+// ---------------------------------------------------------------------------
+// Task 6.5: Export functions and history/XMP methods
+// ---------------------------------------------------------------------------
+(async () => {
+  // Wait for task 6.4 async block to finish by deferring with setImmediate
+  await new Promise((resolve) => setImmediate(resolve));
+
+  console.log("\n--- Task 6.5: Export & History ---");
+
+  const os = require("os");
+  const fs = require("fs");
+  const tmpDir = os.tmpdir();
+
+  // Fresh image + pipeline for export tests
+  let eImg;
+  try {
+    eImg = loadRaw(RAF_PATH);
+  } catch (e) {
+    console.error("✗ loadRaw for export test threw:", e.message);
+    process.exit(1);
+  }
+
+  let ePipe;
+  try {
+    ePipe = createPipeline(eImg);
+  } catch (e) {
+    console.error("✗ createPipeline for export test threw:", e.message);
+    process.exit(1);
+  }
+
+  // --- serializeHistory() ---
+  let histJson;
+  try {
+    histJson = ePipe.serializeHistory();
+  } catch (e) {
+    console.error("✗ serializeHistory threw:", e.message);
+    process.exit(1);
+  }
+  if (typeof histJson !== "string" || histJson.length === 0) {
+    console.error("✗ serializeHistory returned empty/non-string:", histJson);
+    process.exit(1);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(histJson);
+  } catch (e) {
+    console.error("✗ serializeHistory returned invalid JSON:", e.message);
+    process.exit(1);
+  }
+  console.log("✓ serializeHistory() returned valid JSON");
+
+  // --- loadHistory() round-trip ---
+  // Modify a param, serialize, reload, verify restored
+  try {
+    ePipe.setParam("exposure", "exposure", 2.0);
+    const json2 = ePipe.serializeHistory();
+    // Reset to something else
+    ePipe.setParam("exposure", "exposure", 0.0);
+    // Reload
+    ePipe.loadHistory(json2);
+    const val = ePipe.getParam("exposure", "exposure");
+    if (Math.abs(val - 2.0) > 1e-4) {
+      console.error(`✗ loadHistory round-trip: expected 2.0, got ${val}`);
+      process.exit(1);
+    }
+    console.log(`✓ loadHistory() round-trip: exposure = ${val}`);
+  } catch (e) {
+    console.error("✗ loadHistory round-trip threw:", e.message);
+    process.exit(1);
+  }
+
+  // loadHistory with bad JSON should throw
+  try {
+    ePipe.loadHistory("not valid json {{");
+    console.error("✗ expected loadHistory to throw on bad JSON");
+    process.exit(1);
+  } catch (e) {
+    console.log("✓ loadHistory throws on bad JSON:", e.message);
+  }
+
+  // --- saveXmp() ---
+  const xmpPath = path.join(tmpDir, "dtpipe_node_test.xmp");
+  try {
+    ePipe.saveXmp(xmpPath);
+  } catch (e) {
+    console.error("✗ saveXmp threw:", e.message);
+    process.exit(1);
+  }
+  if (!fs.existsSync(xmpPath)) {
+    console.error("✗ saveXmp: file not created at", xmpPath);
+    process.exit(1);
+  }
+  const xmpContent = fs.readFileSync(xmpPath, "utf8");
+  if (!xmpContent.includes("xmpmeta") || !xmpContent.includes("darktable")) {
+    console.error("✗ saveXmp: output does not look like a darktable XMP");
+    process.exit(1);
+  }
+  console.log("✓ saveXmp() created valid XMP file:", xmpPath);
+
+  // --- loadXmp() ---
+  try {
+    ePipe.loadXmp(xmpPath);
+    console.log("✓ loadXmp() succeeded on saved XMP");
+  } catch (e) {
+    console.error("✗ loadXmp threw:", e.message);
+    process.exit(1);
+  }
+
+  // loadXmp with missing file should throw
+  try {
+    ePipe.loadXmp("/no/such/file.xmp");
+    console.error("✗ expected loadXmp to throw on missing file");
+    process.exit(1);
+  } catch (e) {
+    console.log("✓ loadXmp throws on missing file:", e.message);
+  }
+
+  // --- exportJpeg() ---
+  const jpegPath = path.join(tmpDir, "dtpipe_node_test.jpg");
+  try {
+    await ePipe.exportJpeg(jpegPath, 85);
+  } catch (e) {
+    console.error("✗ exportJpeg threw:", e.message);
+    process.exit(1);
+  }
+  if (!fs.existsSync(jpegPath)) {
+    console.error("✗ exportJpeg: file not created at", jpegPath);
+    process.exit(1);
+  }
+  const jpegStat = fs.statSync(jpegPath);
+  if (jpegStat.size < 1000) {
+    console.error("✗ exportJpeg: file suspiciously small:", jpegStat.size);
+    process.exit(1);
+  }
+  console.log(`✓ exportJpeg() created ${jpegStat.size} byte file: ${jpegPath}`);
+
+  // exportJpeg with default quality
+  const jpegPath2 = path.join(tmpDir, "dtpipe_node_test_default.jpg");
+  try {
+    await ePipe.exportJpeg(jpegPath2);
+    console.log("✓ exportJpeg() with default quality succeeded");
+  } catch (e) {
+    console.error("✗ exportJpeg default quality threw:", e.message);
+    process.exit(1);
+  }
+
+  // exportJpeg with bad quality should reject
+  try {
+    await ePipe.exportJpeg(jpegPath, 0);
+    console.error("✗ expected exportJpeg to reject with quality=0");
+    process.exit(1);
+  } catch (e) {
+    console.log("✓ exportJpeg rejects with quality=0:", e.message);
+  }
+
+  // --- exportPng() ---
+  const pngPath = path.join(tmpDir, "dtpipe_node_test.png");
+  try {
+    await ePipe.exportPng(pngPath);
+  } catch (e) {
+    console.error("✗ exportPng threw:", e.message);
+    process.exit(1);
+  }
+  if (!fs.existsSync(pngPath)) {
+    console.error("✗ exportPng: file not created at", pngPath);
+    process.exit(1);
+  }
+  const pngStat = fs.statSync(pngPath);
+  if (pngStat.size < 1000) {
+    console.error("✗ exportPng: file suspiciously small:", pngStat.size);
+    process.exit(1);
+  }
+  console.log(`✓ exportPng() created ${pngStat.size} byte file: ${pngPath}`);
+
+  // --- exportTiff() ---
+  const tiffPath = path.join(tmpDir, "dtpipe_node_test.tiff");
+  try {
+    await ePipe.exportTiff(tiffPath, 8);
+  } catch (e) {
+    console.error("✗ exportTiff threw:", e.message);
+    process.exit(1);
+  }
+  if (!fs.existsSync(tiffPath)) {
+    console.error("✗ exportTiff: file not created at", tiffPath);
+    process.exit(1);
+  }
+  const tiffStat = fs.statSync(tiffPath);
+  if (tiffStat.size < 1000) {
+    console.error("✗ exportTiff: file suspiciously small:", tiffStat.size);
+    process.exit(1);
+  }
+  console.log(
+    `✓ exportTiff(bits=8) created ${tiffStat.size} byte file: ${tiffPath}`,
+  );
+
+  // exportTiff with invalid bits should reject
+  try {
+    await ePipe.exportTiff(tiffPath, 24);
+    console.error("✗ expected exportTiff to reject with bits=24");
+    process.exit(1);
+  } catch (e) {
+    console.log("✓ exportTiff rejects with bits=24:", e.message);
+  }
+
+  // --- Error paths: disposed pipeline ---
+  ePipe.dispose();
+
+  try {
+    ePipe.serializeHistory();
+    console.error("✗ expected serializeHistory to throw after dispose");
+    process.exit(1);
+  } catch (e) {
+    console.log("✓ serializeHistory throws after dispose:", e.message);
+  }
+
+  try {
+    await ePipe.exportJpeg(jpegPath, 90);
+    console.error("✗ expected exportJpeg to reject after dispose");
+    process.exit(1);
+  } catch (e) {
+    console.log("✓ exportJpeg rejects after dispose:", e.message);
+  }
+
+  eImg.dispose();
+
+  // Cleanup temp files
+  for (const f of [jpegPath, jpegPath2, pngPath, tiffPath, xmpPath]) {
+    try {
+      fs.unlinkSync(f);
+    } catch (_) {}
+  }
+
+  console.log("\nAll task 6.5 checks passed.");
+})().catch((err) => {
+  console.error("Unhandled error in async test (6.5):", err);
+  process.exit(1);
+});

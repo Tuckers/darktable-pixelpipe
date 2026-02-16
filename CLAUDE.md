@@ -134,6 +134,7 @@ cp -r libdtpipe/build/share libdtpipe/build-release/
 - 6.2 Wrap Image Loading (`Image` class, `loadRaw()`) — ✅ Complete
 - 6.3 Wrap Pipeline Operations (`Pipeline` class, `createPipeline()`) — ✅ Complete
 - 6.4 Wrap Render (`Pipeline.render()`, `Pipeline.renderRegion()`, `RenderResult` class) — ✅ Complete
+- 6.5 Wrap Export (`Pipeline.exportJpeg()`, `Pipeline.exportPng()`, `Pipeline.exportTiff()`, history/XMP methods) — ✅ Complete
 
 ---
 
@@ -205,6 +206,11 @@ The `_iop_registry[]` in `init.c` now contains stub entries for all 8 modules th
 
 ### Render wrapping (`node/src/addon.cc` — Task 6.4)
 `Pipeline.render(scale)` and `Pipeline.renderRegion(x,y,w,h,scale)` return `Promise<RenderResult>` using `Napi::AsyncWorker` subclasses (`RenderWorker`, `RenderRegionWorker`) that call `dtpipe_render()` / `dtpipe_render_region()` off the main thread. `RenderResult` exposes `buffer` (an `ArrayBuffer` with external data and a free-finalizer), `width`, `height`, and `dispose()`. The pixel data is packed tightly (width×4 bytes per row, no padding) into a malloc'd buffer copied from the render result, which is freed immediately after the copy. `Napi::SharedArrayBuffer` is not available as a C++ wrapper in node-addon-api v8; `ArrayBuffer` is used instead (also transferable via `postMessage`). Note: the first render call on a large RAW is slow (~10s for 50MP without OpenMP) because `dtpipe_ensure_input_buf` builds the full-resolution float-RGBA input buffer single-threaded.
+
+### Export and history wrapping (`node/src/addon.cc` — Task 6.5)
+`Pipeline.exportJpeg(path, quality?)`, `Pipeline.exportPng(path)`, and `Pipeline.exportTiff(path, bits?)` return `Promise<void>` via `ExportJpegWorker`, `ExportPngWorker`, `ExportTiffWorker` (`Napi::AsyncWorker` subclasses). Each captures its parameters in the constructor and calls the corresponding `dtpipe_export_*` function off the main thread. Default quality for JPEG is 90; default bits for TIFF is 16. Validation (quality 1–100, bits in {8,16,32}) is done synchronously before queuing. Note: full-resolution export of a large RAW (e.g. 57MP) is slow (~30–60s single-threaded) because the render step rebuilds the full float-RGBA buffer.
+
+History/XMP methods are synchronous (fast): `serializeHistory()` returns a JSON string (caller-owned from `dtpipe_serialize_history`; freed after creating the Napi::String), `loadHistory(json)` applies a JSON history, `loadXmp(path)` reads a darktable XMP sidecar, `saveXmp(path)` writes one. All throw a JavaScript `Error` on failure.
 
 ### Parameter descriptor tables (`pipe/params.h/.c`)
 Each IOP's params struct is described by a static `dt_param_desc_t[]` array

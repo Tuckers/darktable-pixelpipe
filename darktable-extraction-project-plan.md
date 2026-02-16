@@ -1342,7 +1342,7 @@ ipcMain.handle('render', async () => ({
 
 ### Task 6.5: Wrap Export Functions
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** dtpipe.h
 - **Output:** `node/src/addon.cc` (extended)
 
@@ -1744,7 +1744,7 @@ Copy this to track completion:
 - [ ] 6.2 Wrap Loading
 - [ ] 6.3 Wrap Pipeline
 - [ ] 6.4 Wrap Render
-- [ ] 6.5 Wrap Export
+- [x] 6.5 Wrap Export
 - [ ] 6.6 TypeScript Types
 
 ### Phase 7: Testing

@@ -276,6 +276,118 @@ private:
 };
 
 // ---------------------------------------------------------------------------
+// Async workers for export
+// ---------------------------------------------------------------------------
+
+class ExportJpegWorker : public Napi::AsyncWorker {
+public:
+    ExportJpegWorker(Napi::Promise::Deferred deferred,
+                     dt_pipe_t *pipe,
+                     std::string path,
+                     int quality)
+        : Napi::AsyncWorker(deferred.Env()),
+          deferred_(deferred),
+          pipe_(pipe),
+          path_(std::move(path)),
+          quality_(quality) {}
+
+    void Execute() override {
+        int rc = dtpipe_export_jpeg(pipe_, path_.c_str(), quality_);
+        if (rc != DTPIPE_OK) {
+            const char *err = dtpipe_get_last_error();
+            std::string msg = "exportJpeg failed (rc=" + std::to_string(rc) + ")";
+            if (err && err[0]) { msg += ": "; msg += err; }
+            SetError(msg);
+        }
+    }
+
+    void OnOK() override {
+        deferred_.Resolve(Env().Undefined());
+    }
+
+    void OnError(const Napi::Error &e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    Napi::Promise::Deferred deferred_;
+    dt_pipe_t *pipe_;
+    std::string path_;
+    int quality_;
+};
+
+class ExportPngWorker : public Napi::AsyncWorker {
+public:
+    ExportPngWorker(Napi::Promise::Deferred deferred,
+                    dt_pipe_t *pipe,
+                    std::string path)
+        : Napi::AsyncWorker(deferred.Env()),
+          deferred_(deferred),
+          pipe_(pipe),
+          path_(std::move(path)) {}
+
+    void Execute() override {
+        int rc = dtpipe_export_png(pipe_, path_.c_str());
+        if (rc != DTPIPE_OK) {
+            const char *err = dtpipe_get_last_error();
+            std::string msg = "exportPng failed (rc=" + std::to_string(rc) + ")";
+            if (err && err[0]) { msg += ": "; msg += err; }
+            SetError(msg);
+        }
+    }
+
+    void OnOK() override {
+        deferred_.Resolve(Env().Undefined());
+    }
+
+    void OnError(const Napi::Error &e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    Napi::Promise::Deferred deferred_;
+    dt_pipe_t *pipe_;
+    std::string path_;
+};
+
+class ExportTiffWorker : public Napi::AsyncWorker {
+public:
+    ExportTiffWorker(Napi::Promise::Deferred deferred,
+                     dt_pipe_t *pipe,
+                     std::string path,
+                     int bits)
+        : Napi::AsyncWorker(deferred.Env()),
+          deferred_(deferred),
+          pipe_(pipe),
+          path_(std::move(path)),
+          bits_(bits) {}
+
+    void Execute() override {
+        int rc = dtpipe_export_tiff(pipe_, path_.c_str(), bits_);
+        if (rc != DTPIPE_OK) {
+            const char *err = dtpipe_get_last_error();
+            std::string msg = "exportTiff failed (rc=" + std::to_string(rc) + ")";
+            if (err && err[0]) { msg += ": "; msg += err; }
+            SetError(msg);
+        }
+    }
+
+    void OnOK() override {
+        deferred_.Resolve(Env().Undefined());
+    }
+
+    void OnError(const Napi::Error &e) override {
+        deferred_.Reject(e.Value());
+    }
+
+private:
+    Napi::Promise::Deferred deferred_;
+    dt_pipe_t *pipe_;
+    std::string path_;
+    int bits_;
+};
+
+// ---------------------------------------------------------------------------
 // Pipeline class
 // ---------------------------------------------------------------------------
 
@@ -289,6 +401,13 @@ public:
             InstanceMethod<&Pipeline::IsModuleEnabled>("isModuleEnabled"),
             InstanceMethod<&Pipeline::Render>("render"),
             InstanceMethod<&Pipeline::RenderRegion>("renderRegion"),
+            InstanceMethod<&Pipeline::ExportJpeg>("exportJpeg"),
+            InstanceMethod<&Pipeline::ExportPng>("exportPng"),
+            InstanceMethod<&Pipeline::ExportTiff>("exportTiff"),
+            InstanceMethod<&Pipeline::SerializeHistory>("serializeHistory"),
+            InstanceMethod<&Pipeline::LoadHistory>("loadHistory"),
+            InstanceMethod<&Pipeline::LoadXmp>("loadXmp"),
+            InstanceMethod<&Pipeline::SaveXmp>("saveXmp"),
             InstanceMethod<&Pipeline::Dispose>("dispose"),
         });
     }
@@ -472,6 +591,168 @@ private:
         auto *worker = new RenderRegionWorker(deferred, pipe_, x, y, w, h, scale, std::move(ctorRef));
         worker->Queue();
         return deferred.Promise();
+    }
+
+    // exportJpeg(path: string, quality?: number): Promise<void>
+    Napi::Value ExportJpeg(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        auto deferred = Napi::Promise::Deferred::New(env);
+
+        if (!pipe_) {
+            deferred.Reject(Napi::Error::New(env, "Pipeline already disposed").Value());
+            return deferred.Promise();
+        }
+        if (info.Length() < 1 || !info[0].IsString()) {
+            deferred.Reject(Napi::TypeError::New(env, "exportJpeg(path: string, quality?: number)").Value());
+            return deferred.Promise();
+        }
+        std::string path = info[0].As<Napi::String>().Utf8Value();
+        int quality = 90;
+        if (info.Length() >= 2 && info[1].IsNumber()) {
+            quality = info[1].As<Napi::Number>().Int32Value();
+        }
+        if (quality < 1 || quality > 100) {
+            deferred.Reject(Napi::RangeError::New(env, "quality must be 1-100").Value());
+            return deferred.Promise();
+        }
+
+        auto *worker = new ExportJpegWorker(deferred, pipe_, std::move(path), quality);
+        worker->Queue();
+        return deferred.Promise();
+    }
+
+    // exportPng(path: string): Promise<void>
+    Napi::Value ExportPng(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        auto deferred = Napi::Promise::Deferred::New(env);
+
+        if (!pipe_) {
+            deferred.Reject(Napi::Error::New(env, "Pipeline already disposed").Value());
+            return deferred.Promise();
+        }
+        if (info.Length() < 1 || !info[0].IsString()) {
+            deferred.Reject(Napi::TypeError::New(env, "exportPng(path: string)").Value());
+            return deferred.Promise();
+        }
+        std::string path = info[0].As<Napi::String>().Utf8Value();
+
+        auto *worker = new ExportPngWorker(deferred, pipe_, std::move(path));
+        worker->Queue();
+        return deferred.Promise();
+    }
+
+    // exportTiff(path: string, bits?: number): Promise<void>
+    Napi::Value ExportTiff(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        auto deferred = Napi::Promise::Deferred::New(env);
+
+        if (!pipe_) {
+            deferred.Reject(Napi::Error::New(env, "Pipeline already disposed").Value());
+            return deferred.Promise();
+        }
+        if (info.Length() < 1 || !info[0].IsString()) {
+            deferred.Reject(Napi::TypeError::New(env, "exportTiff(path: string, bits?: number)").Value());
+            return deferred.Promise();
+        }
+        std::string path = info[0].As<Napi::String>().Utf8Value();
+        int bits = 16;
+        if (info.Length() >= 2 && info[1].IsNumber()) {
+            bits = info[1].As<Napi::Number>().Int32Value();
+        }
+        if (bits != 8 && bits != 16 && bits != 32) {
+            deferred.Reject(Napi::RangeError::New(env, "bits must be 8, 16, or 32").Value());
+            return deferred.Promise();
+        }
+
+        auto *worker = new ExportTiffWorker(deferred, pipe_, std::move(path), bits);
+        worker->Queue();
+        return deferred.Promise();
+    }
+
+    // serializeHistory(): string
+    Napi::Value SerializeHistory(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        if (!pipe_) {
+            Napi::Error::New(env, "Pipeline already disposed").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        char *json = dtpipe_serialize_history(pipe_);
+        if (!json) {
+            const char *err = dtpipe_get_last_error();
+            std::string msg = "serializeHistory failed";
+            if (err && err[0]) { msg += ": "; msg += err; }
+            Napi::Error::New(env, msg).ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        Napi::String result = Napi::String::New(env, json);
+        free(json);
+        return result;
+    }
+
+    // loadHistory(json: string): void
+    Napi::Value LoadHistory(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        if (!pipe_) {
+            Napi::Error::New(env, "Pipeline already disposed").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        if (info.Length() < 1 || !info[0].IsString()) {
+            Napi::TypeError::New(env, "loadHistory(json: string)").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        std::string json = info[0].As<Napi::String>().Utf8Value();
+        int rc = dtpipe_load_history(pipe_, json.c_str());
+        if (rc != DTPIPE_OK) {
+            std::string msg = "loadHistory failed (rc=" + std::to_string(rc) + ")";
+            const char *err = dtpipe_get_last_error();
+            if (err && err[0]) { msg += ": "; msg += err; }
+            Napi::Error::New(env, msg).ThrowAsJavaScriptException();
+        }
+        return env.Undefined();
+    }
+
+    // loadXmp(path: string): void
+    Napi::Value LoadXmp(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        if (!pipe_) {
+            Napi::Error::New(env, "Pipeline already disposed").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        if (info.Length() < 1 || !info[0].IsString()) {
+            Napi::TypeError::New(env, "loadXmp(path: string)").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        std::string path = info[0].As<Napi::String>().Utf8Value();
+        int rc = dtpipe_load_xmp(pipe_, path.c_str());
+        if (rc != DTPIPE_OK) {
+            std::string msg = "loadXmp failed (rc=" + std::to_string(rc) + ")";
+            const char *err = dtpipe_get_last_error();
+            if (err && err[0]) { msg += ": "; msg += err; }
+            Napi::Error::New(env, msg).ThrowAsJavaScriptException();
+        }
+        return env.Undefined();
+    }
+
+    // saveXmp(path: string): void
+    Napi::Value SaveXmp(const Napi::CallbackInfo &info) {
+        Napi::Env env = info.Env();
+        if (!pipe_) {
+            Napi::Error::New(env, "Pipeline already disposed").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        if (info.Length() < 1 || !info[0].IsString()) {
+            Napi::TypeError::New(env, "saveXmp(path: string)").ThrowAsJavaScriptException();
+            return env.Undefined();
+        }
+        std::string path = info[0].As<Napi::String>().Utf8Value();
+        int rc = dtpipe_save_xmp(pipe_, path.c_str());
+        if (rc != DTPIPE_OK) {
+            std::string msg = "saveXmp failed (rc=" + std::to_string(rc) + ")";
+            const char *err = dtpipe_get_last_error();
+            if (err && err[0]) { msg += ": "; msg += err; }
+            Napi::Error::New(env, msg).ThrowAsJavaScriptException();
+        }
+        return env.Undefined();
     }
 
     Napi::Value Dispose(const Napi::CallbackInfo &info) {
