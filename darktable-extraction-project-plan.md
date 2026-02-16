@@ -1377,7 +1377,7 @@ console.log('Export complete!');
 
 ### Task 6.6: Write TypeScript Declarations
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** addon.cc
 - **Output:** `node/types/index.d.ts`
 

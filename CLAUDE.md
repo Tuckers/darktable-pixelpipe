@@ -135,6 +135,7 @@ cp -r libdtpipe/build/share libdtpipe/build-release/
 - 6.3 Wrap Pipeline Operations (`Pipeline` class, `createPipeline()`) — ✅ Complete
 - 6.4 Wrap Render (`Pipeline.render()`, `Pipeline.renderRegion()`, `RenderResult` class) — ✅ Complete
 - 6.5 Wrap Export (`Pipeline.exportJpeg()`, `Pipeline.exportPng()`, `Pipeline.exportTiff()`, history/XMP methods) — ✅ Complete
+- 6.6 TypeScript Declarations (`node/types/index.d.ts`) — ✅ Complete
 
 ---
 
@@ -230,6 +231,9 @@ The `_iop_registry[]` in `init.c` now contains stub entries for all 8 modules th
 `Pipeline.exportJpeg(path, quality?)`, `Pipeline.exportPng(path)`, and `Pipeline.exportTiff(path, bits?)` return `Promise<void>` via `ExportJpegWorker`, `ExportPngWorker`, `ExportTiffWorker` (`Napi::AsyncWorker` subclasses). Each captures its parameters in the constructor and calls the corresponding `dtpipe_export_*` function off the main thread. Default quality for JPEG is 90; default bits for TIFF is 16. Validation (quality 1–100, bits in {8,16,32}) is done synchronously before queuing. Note: full-resolution export of a large RAW (e.g. 57MP) is slow (~30–60s single-threaded) because the render step rebuilds the full float-RGBA buffer.
 
 History/XMP methods are synchronous (fast): `serializeHistory()` returns a JSON string (caller-owned from `dtpipe_serialize_history`; freed after creating the Napi::String), `loadHistory(json)` applies a JSON history, `loadXmp(path)` reads a darktable XMP sidecar, `saveXmp(path)` writes one. All throw a JavaScript `Error` on failure.
+
+### TypeScript declarations (`node/types/index.d.ts` — Task 6.6)
+Full `export declare` declarations for `Image`, `Pipeline`, `RenderResult`, `loadRaw()`, and `createPipeline()`. Uses `ArrayBuffer` (not `SharedArrayBuffer`) for `RenderResult.buffer` to match the actual `Napi::ArrayBuffer` implementation. The `package.json` `"types"` field points to this file. Verified with `tsc --strict --noEmit` via a `tsconfig.json` with `paths: { "@app/dtpipe": ["types/index.d.ts"] }`.
 
 ### Parameter descriptor tables (`pipe/params.h/.c`)
 Each IOP's params struct is described by a static `dt_param_desc_t[]` array
