@@ -31,6 +31,7 @@
  */
 
 #include "pipe/create.h"
+#include "pipe/params.h"
 #include "common/iop_order.h"
 #include "dtpipe.h"
 #include "dtpipe_internal.h"
@@ -152,6 +153,16 @@ static _module_node_t *_build_module_list(void)
     /* Default enabled state */
     m->default_enabled = _is_default_enabled(op);
     m->enabled         = m->default_enabled;
+
+    /* Allocate zero-initialised params buffer sized from descriptor table.
+     * Modules without a descriptor table get no buffer (params stays NULL). */
+    size_t psz = dtpipe_params_struct_size(op);
+    if(psz > 0)
+    {
+      m->params         = (dt_iop_params_t *)calloc(1, psz);
+      m->default_params = (dt_iop_params_t *)calloc(1, psz);
+      m->params_size    = (int32_t)psz;
+    }
 
     /* Initialise the gui_lock even though we never use it (code may lock it) */
     dt_pthread_mutex_init(&m->gui_lock);

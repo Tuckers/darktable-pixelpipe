@@ -1170,7 +1170,7 @@ Handle version differences—darktable modules evolve over time.
 
 ### Task 6.1: Create Addon Scaffold
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** None
 - **Output:** `node/` directory structure
 
@@ -1213,7 +1213,7 @@ Use node-addon-api (N-API) for ABI stability across Node versions.
 
 ### Task 6.2: Wrap Image Loading
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** dtpipe.h
 - **Output:** `node/src/addon.cc` (partial)
 
@@ -1255,7 +1255,7 @@ Error handling:
 
 ### Task 6.3: Wrap Pipeline Operations
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** dtpipe.h
 - **Output:** `node/src/addon.cc` (extended)
 
@@ -1295,7 +1295,7 @@ img.dispose();
 
 ### Task 6.4: Wrap Render with SharedArrayBuffer
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** dtpipe.h
 - **Output:** `node/src/addon.cc` (extended)
 

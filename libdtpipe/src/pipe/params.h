@@ -82,6 +82,13 @@ int dtpipe_param_count(const char *op);
  */
 const dt_param_desc_t *dtpipe_get_param_desc(const char *op, int i);
 
+/**
+ * Return the minimum byte size needed to hold all parameters for the given
+ * operation, computed as max(offset + size) across all descriptors.
+ * Returns 0 if the operation has no descriptor table.
+ */
+size_t dtpipe_params_struct_size(const char *op);
+
 #ifdef __cplusplus
 }
 #endif

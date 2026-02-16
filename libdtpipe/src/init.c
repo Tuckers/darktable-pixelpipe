@@ -141,9 +141,21 @@ typedef struct
   iop_init_global_fn_t init_fn;
 } iop_registration_t;
 
+/*
+ * Stub registrations for modules that have descriptor tables in params.c.
+ * These allow pipeline creation and param get/set to work even before the
+ * actual IOP process functions are compiled in.  The process_plain pointer
+ * is left NULL; the pipeline engine skips nodes with a NULL process pointer.
+ */
 static const iop_registration_t _iop_registry[] = {
-  /* { "exposure", dt_iop_exposure_init_global }, */
-  /* Entries will be added here as IOPs are ported */
+  { "rawprepare",  NULL },
+  { "demosaic",    NULL },
+  { "colorin",     NULL },
+  { "exposure",    NULL },
+  { "colorout",    NULL },
+  { "temperature", NULL },
+  { "highlights",  NULL },
+  { "sharpen",     NULL },
 };
 
 static const int _iop_registry_len =

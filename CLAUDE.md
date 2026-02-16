@@ -14,6 +14,18 @@ Extract darktable's image processing pipeline into a standalone C library (`libd
 ## Repository Layout
 
 ```
+node/
+├── package.json              # @app/dtpipe, node-addon-api dep
+├── binding.gyp               # Links against libdtpipe.dylib
+├── src/
+│   └── addon.cc              # N-API addon (empty scaffold → Task 6.2+)
+├── lib/
+│   └── index.js              # JS wrapper (re-exports native)
+├── types/
+│   └── index.d.ts            # TypeScript declarations
+└── test/
+    └── test.js               # Addon load verification
+
 libdtpipe/
 ├── CMakeLists.txt
 ├── include/
@@ -117,8 +129,11 @@ cp -r libdtpipe/build/share libdtpipe/build-release/
 - 5.4 Implement XMP Reading (`src/history/xmp_read.cc`) — ✅ Complete
 - 5.5 Implement XMP Writing (`src/history/xmp_write.cc`) — ✅ Complete
 
-### Phase 6: Node.js Addon — ⬜ Not Started
-- 6.1–6.2: N-API addon scaffold, wrapping image loading + pipeline
+### Phase 6: Node.js Addon — 🔄 In Progress
+- 6.1 Create Addon Scaffold (`node/` directory, binding.gyp, empty addon.cc) — ✅ Complete
+- 6.2 Wrap Image Loading (`Image` class, `loadRaw()`) — ✅ Complete
+- 6.3 Wrap Pipeline Operations (`Pipeline` class, `createPipeline()`) — ✅ Complete
+- 6.4 Wrap Render (`Pipeline.render()`, `Pipeline.renderRegion()`, `RenderResult` class) — ✅ Complete
 
 ---
 
@@ -181,6 +196,15 @@ Uses pugixml to parse darktable XMP sidecar files. Two params encodings exist:
 - **Plain hex** — lowercase hex string of the raw packed struct bytes.
 - **gz-encoded** — `gz` + 2 hex chars (informational, ignored) + standard base64 of a zlib-compressed stream. Decode: skip 4 chars, base64-decode remainder, `uncompress()`.
 History entries are deduplicated per operation name by keeping the one with the highest `darktable:num` that is `< darktable:history_end`. Multi-instance modules (`multi_priority > 0`) are skipped. Once decoded, the raw struct bytes are applied field-by-field via the param descriptor table (same offsets as the darktable binary). Modules without a descriptor table get a raw `memcpy`. Tests in `tests/test_xmp_read.c`.
+
+### Stub SO registrations (`init.c`)
+The `_iop_registry[]` in `init.c` now contains stub entries for all 8 modules that have descriptor tables (`rawprepare`, `demosaic`, `colorin`, `colorout`, `exposure`, `temperature`, `highlights`, `sharpen`). These stubs set `process_plain = NULL` — the pixelpipe engine skips nodes with no process function and logs a warning. This allows `dtpipe_create()` to build module instances (and allocate params buffers) for all descriptor-table modules without requiring compiled IOP code. When real IOP source is compiled in, the stub entry is replaced with the actual `init_global` function that sets `process_plain`.
+
+### Params buffer allocation (`pipe/create.c` + `pipe/params.c`)
+`_build_module_list()` now calls `dtpipe_params_struct_size(op)` (added to `params.c`) after creating each module instance. If the op has a descriptor table, a zero-initialised params buffer of `max(offset + size)` bytes is allocated for both `m->params` and `m->default_params`. Modules without a descriptor table leave `m->params = NULL` and `params_size = 0` — `dtpipe_set_param_float` returns `DTPIPE_ERR_NOT_FOUND` for them.
+
+### Render wrapping (`node/src/addon.cc` — Task 6.4)
+`Pipeline.render(scale)` and `Pipeline.renderRegion(x,y,w,h,scale)` return `Promise<RenderResult>` using `Napi::AsyncWorker` subclasses (`RenderWorker`, `RenderRegionWorker`) that call `dtpipe_render()` / `dtpipe_render_region()` off the main thread. `RenderResult` exposes `buffer` (an `ArrayBuffer` with external data and a free-finalizer), `width`, `height`, and `dispose()`. The pixel data is packed tightly (width×4 bytes per row, no padding) into a malloc'd buffer copied from the render result, which is freed immediately after the copy. `Napi::SharedArrayBuffer` is not available as a C++ wrapper in node-addon-api v8; `ArrayBuffer` is used instead (also transferable via `postMessage`). Note: the first render call on a large RAW is slow (~10s for 50MP without OpenMP) because `dtpipe_ensure_input_buf` builds the full-resolution float-RGBA input buffer single-threaded.
 
 ### Parameter descriptor tables (`pipe/params.h/.c`)
 Each IOP's params struct is described by a static `dt_param_desc_t[]` array

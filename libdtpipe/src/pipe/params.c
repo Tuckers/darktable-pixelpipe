@@ -337,6 +337,31 @@ const dt_param_desc_t *dtpipe_get_param_desc(const char *op, int i)
   return NULL;
 }
 
+/* ── dtpipe_params_struct_size ───────────────────────────────────────────── */
+
+size_t dtpipe_params_struct_size(const char *op)
+{
+  if(!op)
+    return 0;
+
+  for(int t = 0; t < _module_param_tables_count; t++)
+  {
+    if(strncmp(_module_param_tables[t].op, op, 20) != 0)
+      continue;
+
+    size_t max_end = 0;
+    const dt_module_param_table_t *tbl = &_module_param_tables[t];
+    for(int i = 0; i < tbl->count; i++)
+    {
+      size_t end = tbl->params[i].offset + tbl->params[i].size;
+      if(end > max_end)
+        max_end = end;
+    }
+    return max_end;
+  }
+  return 0;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Public API implementation
  * ══════════════════════════════════════════════════════════════════════════*/
@@ -458,5 +483,20 @@ int dtpipe_enable_module(dt_pipe_t *pipe, const char *module_name, int enabled)
     return DTPIPE_ERR_NOT_FOUND;
 
   m->enabled = (enabled != 0);
+  return DTPIPE_OK;
+}
+
+/* ── dtpipe_is_module_enabled ───────────────────────────────────────────── */
+
+int dtpipe_is_module_enabled(dt_pipe_t *pipe, const char *module_name, int *out)
+{
+  if(!pipe || !module_name || !out)
+    return DTPIPE_ERR_INVALID_ARG;
+
+  dt_iop_module_t *m = dtpipe_find_module(pipe, module_name);
+  if(!m)
+    return DTPIPE_ERR_NOT_FOUND;
+
+  *out = m->enabled ? 1 : 0;
   return DTPIPE_OK;
 }

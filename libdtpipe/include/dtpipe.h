@@ -245,6 +245,16 @@ int dtpipe_get_param_float(dt_pipe_t *pipe, const char *module,
  */
 int dtpipe_enable_module(dt_pipe_t *pipe, const char *module, int enabled);
 
+/*
+ * dtpipe_is_module_enabled - Query whether a module is currently enabled.
+ *
+ * out: receives 1 if enabled, 0 if disabled. Must not be NULL.
+ *
+ * Returns DTPIPE_OK or DTPIPE_ERR_NOT_FOUND if the module does not exist.
+ * Returns DTPIPE_ERR_INVALID_ARG if pipe, module, or out is NULL.
+ */
+int dtpipe_is_module_enabled(dt_pipe_t *pipe, const char *module, int *out);
+
 /* -------------------------------------------------------------------------
  * Rendering
  * -------------------------------------------------------------------------
