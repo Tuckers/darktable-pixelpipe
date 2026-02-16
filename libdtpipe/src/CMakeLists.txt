@@ -60,7 +60,7 @@ if(DTPIPE_HAVE_OPENCL)
 endif()
 
 if(DTPIPE_HAVE_OPENMP)
-  target_link_libraries(dtpipe PRIVATE OpenMP::OpenMP_C)
+  target_link_libraries(dtpipe PRIVATE OpenMP::OpenMP_C OpenMP::OpenMP_CXX)
   target_compile_definitions(dtpipe PRIVATE DTPIPE_HAVE_OPENMP=1)
 endif()
 

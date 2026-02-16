@@ -108,7 +108,26 @@ endif()
 
 # OpenMP
 if(DTPIPE_ENABLE_OPENMP)
-  find_package(OpenMP QUIET COMPONENTS C)
+  find_package(OpenMP QUIET COMPONENTS C CXX)
+  if(NOT OpenMP_C_FOUND)
+    # Apple Clang doesn't ship OpenMP — try Homebrew libomp
+    find_program(_BREW brew)
+    if(_BREW)
+      execute_process(COMMAND ${_BREW} --prefix libomp
+                      OUTPUT_VARIABLE _LIBOMP_PREFIX
+                      OUTPUT_STRIP_TRAILING_WHITESPACE
+                      ERROR_QUIET)
+    endif()
+    if(_LIBOMP_PREFIX AND EXISTS "${_LIBOMP_PREFIX}/lib/libomp.dylib")
+      message(STATUS "Using Homebrew libomp at ${_LIBOMP_PREFIX}")
+      set(OpenMP_C_FLAGS        "-Xclang -fopenmp -I${_LIBOMP_PREFIX}/include" CACHE STRING "" FORCE)
+      set(OpenMP_CXX_FLAGS      "-Xclang -fopenmp -I${_LIBOMP_PREFIX}/include" CACHE STRING "" FORCE)
+      set(OpenMP_C_LIB_NAMES    "omp" CACHE STRING "" FORCE)
+      set(OpenMP_CXX_LIB_NAMES  "omp" CACHE STRING "" FORCE)
+      set(OpenMP_omp_LIBRARY     "${_LIBOMP_PREFIX}/lib/libomp.dylib" CACHE FILEPATH "" FORCE)
+      find_package(OpenMP QUIET COMPONENTS C CXX)
+    endif()
+  endif()
   if(OpenMP_C_FOUND)
     message(STATUS "OpenMP found: ${OpenMP_C_VERSION}")
     set(DTPIPE_HAVE_OPENMP TRUE)

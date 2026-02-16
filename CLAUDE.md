@@ -162,6 +162,17 @@ rendering is completed). Pipeline creation works correctly with zero modules
 When no XMP/history is loaded, these modules are enabled by default:
 `rawprepare`, `demosaic`, `colorin`, `exposure`, `colorout`
 
+### OpenMP on macOS
+Apple Clang doesn't ship OpenMP. The CMake build auto-detects Homebrew's `libomp`
+(`brew install libomp`) via `brew --prefix libomp` and sets `-Xclang -fopenmp`
+flags. The `DT_OMP_FOR()` / `DT_OMP_FOR_SIMD()` macros use `DT_OMP_PRAGMA()`
+(which stringifies via `_Pragma(#__VA_ARGS__)`) to produce a single string literal,
+avoiding C++ `_Pragma` concatenation issues. `default(shared)` is used instead of
+`default(firstprivate)` (which requires OpenMP 5.1, unsupported by Homebrew libomp).
+Both `OpenMP::OpenMP_C` and `OpenMP::OpenMP_CXX` are linked so `.cc` files
+including `dtpipe_internal.h` also see `_OPENMP` defined. After a clean
+reconfigure, both `libdtpipe` and rawspeed build with OpenMP threading.
+
 ### GLib replacement
 GList and related types are replaced throughout with plain C singly-linked lists.
 The `void *` fields on `dt_dev_pixelpipe_t` (`iop`, `nodes`, `iop_order_list`)
@@ -171,6 +182,14 @@ store internal list head pointers, cast at use sites.
 `dt_ioppr_transform_image_colorspace()` is a passthrough stub in
 `dtpipe_internal.h`. Full ICC-based transforms are deferred to Phase 4+ color
 management work.
+
+### Pipeline base-case buffer descriptor (`pipe/pixelpipe.c`)
+The `_process_rec()` base case (no more nodes) now explicitly sets the output
+format descriptor to `{channels=4, datatype=TYPE_FLOAT, cst=IOP_CS_RGB}` before
+computing `bpp` and `bufsize`. Without this, when enabled modules have no process
+function, intermediate recursive levels pass zero-initialized `_input_format`
+structs as `out_format`, leading to `bpp=0`, a zero-size `backbuf` allocation,
+and a buffer overread in `_float_to_u8_rgba`.
 
 ### Pipeline cache
 `dt_dev_pixelpipe_cache_*` functions are stubs that always return a cache miss.

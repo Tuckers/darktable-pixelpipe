@@ -439,6 +439,13 @@ static bool _process_rec(dt_dev_pixelpipe_t *pipe,
     if(dt_pipe_shutdown(pipe))
       return true;
 
+    /* The input buffer is always float RGBA (4 channels) — ensure the
+       output format descriptor reflects this so callers compute correct
+       buffer sizes. */
+    (**out_format).channels = 4;
+    (**out_format).datatype = TYPE_FLOAT;
+    (**out_format).cst      = IOP_CS_RGB;
+
     const size_t bpp     = dt_iop_buffer_dsc_to_bpp(*out_format);
     const size_t bufsize = (size_t)bpp * roi_out->width * roi_out->height;
 

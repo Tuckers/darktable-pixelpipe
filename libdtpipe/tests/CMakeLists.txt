@@ -2,6 +2,31 @@ enable_testing()
 
 set(RAF_PATH "${CMAKE_SOURCE_DIR}/../test-image/DSCF4379.RAF")
 
+# ── Performance benchmark ──────────────────────────────────────────────────────
+
+add_executable(benchmark_performance
+  benchmark_performance.c
+)
+
+target_link_libraries(benchmark_performance PRIVATE dtpipe m)
+
+target_include_directories(benchmark_performance PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h
+  ${CMAKE_SOURCE_DIR}/src        # dtpipe_internal.h (thread count)
+)
+
+if(DTPIPE_HAVE_OPENMP)
+  target_link_libraries(benchmark_performance PRIVATE OpenMP::OpenMP_C)
+endif()
+
+add_test(
+  NAME    benchmark_performance
+  COMMAND benchmark_performance "${RAF_PATH}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+set_tests_properties(benchmark_performance PROPERTIES TIMEOUT 120)
+
 # ── Task 5.5 verification ─────────────────────────────────────────────────────
 
 add_executable(test_xmp_write

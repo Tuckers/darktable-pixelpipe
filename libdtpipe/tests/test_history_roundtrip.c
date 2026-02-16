@@ -231,6 +231,9 @@ static void test_enabled_state_reflected(dt_pipe_t *pipe)
     return;
   }
 
+  /* Ensure the module starts enabled so disabling produces a diff */
+  dtpipe_enable_module(pipe, op, 1);
+
   char *json_enabled = dtpipe_serialize_history(pipe);
   CHECK(json_enabled != NULL, "serialization with module enabled");
   if(!json_enabled) return;

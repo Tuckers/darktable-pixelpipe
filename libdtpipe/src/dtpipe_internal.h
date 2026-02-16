@@ -41,25 +41,26 @@ extern "C" {
 #ifdef _OPENMP
 #  include <omp.h>
 #  define DT_OMP_PRAGMA(...) _Pragma(#__VA_ARGS__)
-#  define DT_OMP_FOR(clauses) \
-     _Pragma("omp parallel for default(firstprivate) schedule(static) " #clauses)
-#  define DT_OMP_FOR_SIMD(clauses) \
-     _Pragma("omp parallel for simd default(firstprivate) schedule(simd:static) " #clauses)
-#  define DT_OMP_SIMD(clauses) _Pragma("omp simd " #clauses)
-#  define DT_OMP_DECLARE_SIMD(clauses) _Pragma("omp declare simd " #clauses)
+#  define DT_OMP_FOR(...) \
+     DT_OMP_PRAGMA(omp parallel for schedule(static) __VA_ARGS__)
+#  define DT_OMP_FOR_SIMD(...) \
+     DT_OMP_PRAGMA(omp parallel for simd schedule(static) __VA_ARGS__)
+#  define DT_OMP_SIMD(...) DT_OMP_PRAGMA(omp simd __VA_ARGS__)
+#  define DT_OMP_DECLARE_SIMD(...) DT_OMP_PRAGMA(omp declare simd __VA_ARGS__)
 #  define dt_omp_firstprivate(...) firstprivate(__VA_ARGS__)
 #  define dt_omp_nontemporal(...)
 #  define dt_omp_sharedconst(...) shared(__VA_ARGS__)
 static inline int dt_get_num_threads(void) {
-  return (int)CLAMP(omp_get_num_procs(), 1, 64);
+  int n = omp_get_num_procs();
+  return n < 1 ? 1 : (n > 64 ? 64 : n);
 }
 static inline int dt_get_thread_num(void) { return omp_get_thread_num(); }
 #else
 #  define DT_OMP_PRAGMA(...)
-#  define DT_OMP_FOR(clauses)
-#  define DT_OMP_FOR_SIMD(clauses)
-#  define DT_OMP_SIMD(clauses)
-#  define DT_OMP_DECLARE_SIMD(clauses)
+#  define DT_OMP_FOR(...)
+#  define DT_OMP_FOR_SIMD(...)
+#  define DT_OMP_SIMD(...)
+#  define DT_OMP_DECLARE_SIMD(...)
 #  define dt_omp_firstprivate(...)
 #  define dt_omp_nontemporal(...)
 #  define dt_omp_sharedconst(...)
@@ -103,13 +104,13 @@ typedef float DT_ALIGNED_ARRAY dt_colormatrix_t[4][4];
 
 #if defined(_OPENMP) && !defined(DT_NO_SIMD_HINTS)
 #  define for_each_channel(_var, ...) \
-     _Pragma("omp simd " #__VA_ARGS__) \
+     DT_OMP_PRAGMA(omp simd __VA_ARGS__) \
      for (size_t _var = 0; _var < DT_PIXEL_SIMD_CHANNELS; _var++)
 #  define for_four_channels(_var, ...) \
-     _Pragma("omp simd " #__VA_ARGS__) \
+     DT_OMP_PRAGMA(omp simd __VA_ARGS__) \
      for (size_t _var = 0; _var < 4; _var++)
 #  define for_three_channels(_var, ...) \
-     _Pragma("omp simd " #__VA_ARGS__) \
+     DT_OMP_PRAGMA(omp simd __VA_ARGS__) \
      for (size_t _var = 0; _var < 3; _var++)
 #else
 #  define for_each_channel(_var, ...)   for (size_t _var = 0; _var < DT_PIXEL_SIMD_CHANNELS; _var++)
