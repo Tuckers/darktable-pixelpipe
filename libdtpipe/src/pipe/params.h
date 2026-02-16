@@ -75,6 +75,13 @@ const dt_param_desc_t *dtpipe_lookup_param(const char *op,
  */
 int dtpipe_param_count(const char *op);
 
+/**
+ * Return the i-th parameter descriptor for the given operation.
+ * Returns NULL if the operation is not found or i is out of range.
+ * Useful for iterating all parameters of a module (e.g. during serialization).
+ */
+const dt_param_desc_t *dtpipe_get_param_desc(const char *op, int i);
+
 #ifdef __cplusplus
 }
 #endif

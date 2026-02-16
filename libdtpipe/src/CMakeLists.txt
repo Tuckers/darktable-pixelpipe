@@ -5,6 +5,10 @@ set(DTPIPE_SOURCES
   pipe/create.c
   pipe/params.c
   pipe/render.c
+  history/serialize.c
+  history/deserialize.c
+  history/xmp_read.cc
+  history/xmp_write.cc
   imageio/load.cc
   imageio/export.cc
 )

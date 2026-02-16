@@ -2,6 +2,79 @@ enable_testing()
 
 set(RAF_PATH "${CMAKE_SOURCE_DIR}/../test-image/DSCF4379.RAF")
 
+# ── Task 5.5 verification ─────────────────────────────────────────────────────
+
+add_executable(test_xmp_write
+  test_xmp_write.c
+)
+
+target_link_libraries(test_xmp_write PRIVATE dtpipe m)
+
+target_include_directories(test_xmp_write PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_test(
+  NAME    xmp_write
+  COMMAND test_xmp_write "${RAF_PATH}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+# ── Task 5.4 verification ─────────────────────────────────────────────────────
+
+add_executable(test_xmp_read
+  test_xmp_read.c
+)
+
+target_link_libraries(test_xmp_read PRIVATE dtpipe m)
+
+target_include_directories(test_xmp_read PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_test(
+  NAME    xmp_read
+  COMMAND test_xmp_read "${RAF_PATH}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+# ── Task 5.3 verification ─────────────────────────────────────────────────────
+
+add_executable(test_history_deserialize
+  test_history_deserialize.c
+)
+
+target_link_libraries(test_history_deserialize PRIVATE dtpipe)
+
+target_include_directories(test_history_deserialize PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_test(
+  NAME    history_deserialize
+  COMMAND test_history_deserialize "${RAF_PATH}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+# ── Task 5.2 verification ─────────────────────────────────────────────────────
+
+add_executable(test_history_roundtrip
+  test_history_roundtrip.c
+)
+
+target_link_libraries(test_history_roundtrip PRIVATE dtpipe)
+
+target_include_directories(test_history_roundtrip PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_test(
+  NAME    history_roundtrip
+  COMMAND test_history_roundtrip "${RAF_PATH}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+
 # ── Task 4.6 verification ─────────────────────────────────────────────────────
 
 add_executable(test_pipeline_export

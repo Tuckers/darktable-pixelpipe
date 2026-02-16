@@ -318,6 +318,25 @@ int dtpipe_param_count(const char *op)
   return -1;
 }
 
+/* ── dtpipe_get_param_desc ───────────────────────────────────────────────── */
+
+const dt_param_desc_t *dtpipe_get_param_desc(const char *op, int i)
+{
+  if(!op || i < 0)
+    return NULL;
+
+  for(int t = 0; t < _module_param_tables_count; t++)
+  {
+    if(strncmp(_module_param_tables[t].op, op, 20) == 0)
+    {
+      if(i >= _module_param_tables[t].count)
+        return NULL;
+      return &_module_param_tables[t].params[i];
+    }
+  }
+  return NULL;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Public API implementation
  * ══════════════════════════════════════════════════════════════════════════*/

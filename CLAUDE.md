@@ -29,13 +29,22 @@ libdtpipe/
 │   │   ├── create.h/.c       # dtpipe_create(), dtpipe_free(), struct dt_pipe_s
 │   │   ├── params.h          # dt_param_desc_t, descriptor table types
 │   │   └── params.c          # dtpipe_set/get_param_float/int, dtpipe_enable_module
+│   ├── history/
+│   │   ├── serialize.h/.c    # dtpipe_serialize_history() → JSON string
+│   │   ├── deserialize.h/.c  # dtpipe_load_history() from JSON
+│   │   ├── xmp_read.h/.cc    # dtpipe_load_xmp() via pugixml
+│   │   └── xmp_write.h/.cc   # dtpipe_save_xmp() via pugixml
 │   └── imageio/
 │       └── load.cc           # dtpipe_load_raw() via rawspeed + exiv2
 └── tests/
     ├── test_pipeline_process.c   # Task 3.5: pixelpipe engine tests
     ├── test_pipeline_create.c    # Task 4.3: public API create/free tests
     ├── test_pipeline_params.c    # Task 4.4: public API parameter access tests
-    └── test_params_unit.c        # Task 4.4: internal descriptor + buffer round-trip
+    ├── test_params_unit.c        # Task 4.4: internal descriptor + buffer round-trip
+    ├── test_history_roundtrip.c  # Task 5.2: JSON serialize/deserialize round-trip
+    ├── test_history_deserialize.c # Task 5.3: JSON deserialization tests
+    ├── test_xmp_read.c           # Task 5.4: XMP reading tests
+    └── test_xmp_write.c          # Task 5.5: XMP writing tests
 ```
 
 ---
@@ -101,8 +110,12 @@ cp -r libdtpipe/build/share libdtpipe/build-release/
 - 4.5 Implement Render (`pipe/render.c`) — ✅ Complete
 - 4.6 Implement Export (`imageio/export.cc`) — ✅ Complete
 
-### Phase 5: History Serialization — ⬜ Not Started
-- 5.1–5.5: JSON history format, XMP read/write
+### Phase 5: History Serialization — ✅ Complete
+- 5.1 Design History JSON Format (`docs/history-format.md`) — ✅ Complete
+- 5.2 Implement History Serialization (`src/history/serialize.c`) — ✅ Complete
+- 5.3 Implement History Deserialization (`src/history/deserialize.c`) — ✅ Complete
+- 5.4 Implement XMP Reading (`src/history/xmp_read.cc`) — ✅ Complete
+- 5.5 Implement XMP Writing (`src/history/xmp_write.cc`) — ✅ Complete
 
 ### Phase 6: Node.js Addon — ⬜ Not Started
 - 6.1–6.2: N-API addon scaffold, wrapping image loading + pipeline
@@ -146,6 +159,28 @@ management work.
 ### Pipeline cache
 `dt_dev_pixelpipe_cache_*` functions are stubs that always return a cache miss.
 A real LRU cache can be added later once correctness is verified.
+
+### History deserializer (`history/deserialize.c`)
+Minimal recursive-descent JSON parser — no third-party library. Two-phase:
+Phase 1 walks the top-level document, dispatching the `"modules"` object.
+Phase 2 applies each module's `"enabled"`, `"version"`, and `"params"` keys
+directly to the live pipeline via `dtpipe_find_module()` + `memcpy` into the
+params buffer (guided by descriptor offsets). Error policy: unknown modules
+and unknown params warn and skip; malformed JSON returns `DTPIPE_ERR_FORMAT`;
+missing `"version"` key is rejected. Tests in `tests/test_history_deserialize.c`.
+
+### XMP writer (`history/xmp_write.cc`)
+Uses pugixml to build and write darktable-compatible XMP sidecar files.
+Structure: `x:xmpmeta` → `rdf:RDF` → `rdf:Description` (with `darktable:history_end`) → `darktable:history` → `rdf:Seq` of `rdf:li` entries.
+Each `rdf:li` carries: `darktable:num`, `operation`, `enabled`, `modversion` (always 0), `params` (plain lowercase hex of raw params bytes), `multi_priority` (always 0), `multi_name` (always "").
+Plain hex encoding is used (simpler than gz-base64; darktable reads both).
+Tests in `tests/test_xmp_write.c`.
+
+### XMP reader (`history/xmp_read.cc`)
+Uses pugixml to parse darktable XMP sidecar files. Two params encodings exist:
+- **Plain hex** — lowercase hex string of the raw packed struct bytes.
+- **gz-encoded** — `gz` + 2 hex chars (informational, ignored) + standard base64 of a zlib-compressed stream. Decode: skip 4 chars, base64-decode remainder, `uncompress()`.
+History entries are deduplicated per operation name by keeping the one with the highest `darktable:num` that is `< darktable:history_end`. Multi-instance modules (`multi_priority > 0`) are skipped. Once decoded, the raw struct bytes are applied field-by-field via the param descriptor table (same offsets as the darktable binary). Modules without a descriptor table get a raw `memcpy`. Tests in `tests/test_xmp_read.c`.
 
 ### Parameter descriptor tables (`pipe/params.h/.c`)
 Each IOP's params struct is described by a static `dt_param_desc_t[]` array
