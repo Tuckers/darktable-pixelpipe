@@ -2,6 +2,11 @@ set(DTPIPE_SOURCES
   init.c
   common/iop_order.c
   pipe/pixelpipe.c
+  pipe/create.c
+  pipe/params.c
+  pipe/render.c
+  imageio/load.cc
+  imageio/export.cc
 )
 
 add_library(dtpipe SHARED ${DTPIPE_SOURCES})
@@ -15,6 +20,15 @@ target_include_directories(dtpipe
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/pipe
+    # rawspeed public headers (fetched via FetchContent)
+    ${rawspeed_SOURCE_DIR}/src/librawspeed
+    ${rawspeed_BINARY_DIR}/src  # generated rawspeedconfig.h lives here
+)
+
+# Pass the build-tree data directory so load.cc can locate cameras.xml
+target_compile_definitions(dtpipe
+  PRIVATE
+    DTPIPE_DATADIR="${CMAKE_BINARY_DIR}/share/dtpipe"
 )
 
 # ── Language standard ─────────────────────────────────────────────────────────

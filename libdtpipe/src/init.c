@@ -37,7 +37,7 @@ static cmsHPROFILE _srgb_profile = NULL;
 static pthread_once_t _init_once = PTHREAD_ONCE_INIT;
 
 /* Result stored by the once-initializer so concurrent callers can retrieve it */
-static dtpipe_error_t _init_result = DTPIPE_OK;
+static int _init_result = DTPIPE_OK;
 
 /* Whether init has been called at all (distinct from once_flag) */
 static atomic_int _initialized = 0;
@@ -53,13 +53,13 @@ static void _lcms_error_handler(cmsContext ctx, cmsUInt32Number code,
   fprintf(stderr, "[dtpipe/lcms2] error %u: %s\n", (unsigned)code, text);
 }
 
-static dtpipe_error_t _init_color_management(void)
+static int _init_color_management(void)
 {
   _lcms_ctx = cmsCreateContext(NULL, NULL);
   if (!_lcms_ctx)
   {
     fprintf(stderr, "[dtpipe] Failed to create lcms2 context\n");
-    return DTPIPE_ERROR_GENERIC;
+    return DTPIPE_ERR_GENERIC;
   }
 
   cmsSetLogErrorHandlerTHR(_lcms_ctx, _lcms_error_handler);
@@ -71,7 +71,7 @@ static dtpipe_error_t _init_color_management(void)
     fprintf(stderr, "[dtpipe] Failed to create sRGB profile\n");
     cmsDeleteContext(_lcms_ctx);
     _lcms_ctx = NULL;
-    return DTPIPE_ERROR_GENERIC;
+    return DTPIPE_ERR_GENERIC;
   }
 
   return DTPIPE_OK;
@@ -212,9 +212,17 @@ static void _detect_codepath(void)
 
 /* ── Main init / cleanup (run exactly once via call_once) ────────────────── */
 
+static char *_init_data_dir = NULL; /* data_dir passed to dtpipe_init() */
+
 static void _do_init(void)
 {
   memset(&darktable, 0, sizeof(darktable));
+
+  /* Store data directory */
+  if(_init_data_dir && _init_data_dir[0])
+  {
+    darktable.datadir = strdup(_init_data_dir);
+  }
 
   /* CPU feature detection */
   _detect_codepath();
@@ -227,7 +235,7 @@ static void _do_init(void)
 #endif
 
   /* Color management */
-  dtpipe_error_t rc = _init_color_management();
+  int rc = _init_color_management();
   if (rc != DTPIPE_OK)
   {
     _init_result = rc;
@@ -248,8 +256,12 @@ static void _do_init(void)
 
 /* ── Public API ──────────────────────────────────────────────────────────── */
 
-dtpipe_error_t dtpipe_init(void)
+int dtpipe_init(const char *data_dir)
 {
+  /* Store data_dir before calling _do_init (which runs at most once) */
+  if(data_dir && data_dir[0] && !_init_data_dir)
+    _init_data_dir = strdup(data_dir);
+
   pthread_once(&_init_once, _do_init);
   return _init_result;
 }
@@ -267,9 +279,11 @@ void dtpipe_cleanup(void)
   /* Release color management */
   _cleanup_color_management();
 
-  /* Free data dir string if set */
+  /* Free data dir strings */
   free(darktable.datadir);
   darktable.datadir = NULL;
+  free(_init_data_dir);
+  _init_data_dir = NULL;
 
   memset(&darktable, 0, sizeof(darktable));
 }

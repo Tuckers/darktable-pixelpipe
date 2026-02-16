@@ -30,6 +30,10 @@
 
 #ifdef __cplusplus
 extern "C" {
+/* C++ does not have 'restrict'; map it to __restrict__ (GCC/Clang extension). */
+#  ifndef restrict
+#    define restrict __restrict__
+#  endif
 #endif
 
 /* ── OpenMP shims ─────────────────────────────────────────────────────────── */
@@ -707,6 +711,13 @@ typedef struct dt_image_t
 
   /* User crop (normalised bounding box: x0,y0,x1,y1) */
   float              usercrop[4];
+
+  /* Raw pixel buffer (populated by dtpipe_load_raw).
+     16-bit Bayer (uint16_t) or float mosaic, row-major, uncropped.
+     Allocated with malloc; freed by dtpipe_free_image(). */
+  void    *pixels;
+  size_t   pixels_size; /* bytes */
+  uint32_t bpp;         /* bytes per pixel: 2 = uint16, 4 = float */
 } dt_image_t;
 
 /* Image flag bits */

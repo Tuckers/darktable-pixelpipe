@@ -655,7 +655,7 @@ cd build-check && ctest --output-on-failure
 
 ### Task 4.1: Define Public Header
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete & verified
 - **Input:** API specification
 - **Output:** `include/dtpipe.h`
 
@@ -722,9 +722,9 @@ const char *dtpipe_get_module_name(int index);
 
 ### Task 4.2: Implement Image Loading
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** rawspeed integration
-- **Output:** `src/imageio/load.c`
+- **Output:** `src/imageio/load.cc`
 
 **Claude Code Prompt:**
 ```
@@ -768,7 +768,7 @@ Support common RAW formats: CR2, CR3, NEF, ARW, RAF, ORF, DNG
 
 ### Task 4.3: Implement Pipeline Creation
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Pipeline infrastructure
 - **Output:** `src/pipe/create.c`
 
@@ -814,7 +814,7 @@ dtpipe_free(dt_pipe_t *pipe) should:
 
 ### Task 4.4: Implement Parameter Access
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Module param schemas
 - **Output:** `src/pipe/params.c`
 
@@ -858,7 +858,7 @@ Start with exposure module as template:
 
 ### Task 4.5: Implement Render
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Pipeline processing code
 - **Output:** `src/pipe/render.c`
 
@@ -905,7 +905,7 @@ Performance considerations:
 
 ### Task 4.6: Implement Export
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Format libraries
 - **Output:** `src/imageio/export.c`
 
