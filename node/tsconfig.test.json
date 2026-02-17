@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@app/dtpipe": ["./types/index.d.ts"],
+    },
+  },
+  "include": ["test/test.cts", "types/index.d.ts"],
+}

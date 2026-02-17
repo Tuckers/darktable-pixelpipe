@@ -49,6 +49,31 @@ add_custom_target(generate_reference
   COMMENT "Generating reference renders to ${REFERENCE_DIR}"
 )
 
+# ── Task 7.3: Regression tests ───────────────────────────────────────────────
+#
+# Renders each reference preset at scale 0.25 and compares pixel-by-pixel
+# against the PNG ground truth in tests/reference/.
+#
+#   cmake --build libdtpipe/build-release && ctest -R regression
+
+add_executable(test_regression
+  test_regression.c
+)
+
+target_link_libraries(test_regression PRIVATE dtpipe PNG::PNG m)
+
+target_include_directories(test_regression PRIVATE
+  ${CMAKE_SOURCE_DIR}/include    # dtpipe.h (public API only)
+)
+
+add_test(
+  NAME    regression
+  COMMAND test_regression "${RAF_PATH}" "${REFERENCE_DIR}"
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+set_tests_properties(regression PROPERTIES TIMEOUT 300)
+
 # ── Performance benchmark ──────────────────────────────────────────────────────
 
 add_executable(benchmark_performance

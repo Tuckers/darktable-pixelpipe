@@ -7,12 +7,15 @@
   "scripts": {
     "build": "node-gyp build",
     "rebuild": "node-gyp rebuild",
-    "test": "node test/test.js"
+    "test": "node test/test.js",
+    "test:ts": "node --experimental-strip-types test/test.cts",
+    "typecheck": "tsc --project tsconfig.test.json"
   },
   "dependencies": {
     "node-addon-api": "^8.0.0"
   },
   "devDependencies": {
+    "@types/node": "^25.2.3",
     "typescript": "^5.9.3"
   }
 }

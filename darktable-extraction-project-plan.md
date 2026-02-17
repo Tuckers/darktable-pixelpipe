@@ -1516,7 +1516,7 @@ Run once to establish baseline, re-run when intentionally changing processing.
 
 ### Task 7.3: Implement Regression Tests
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** Reference renders
 - **Output:** `tests/test_regression.c`
 
@@ -1553,9 +1553,9 @@ On failure:
 
 ### Task 7.4: Write Node.js Tests
 
-- [ ] **Status:** Not Started
+- [x] **Status:** Complete
 - **Input:** TypeScript declarations
-- **Output:** `node/test/test.ts`
+- **Output:** `node/test/test.cts`
 
 **Claude Code Prompt:**
 ```
