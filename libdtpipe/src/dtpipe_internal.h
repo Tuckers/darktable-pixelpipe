@@ -967,6 +967,59 @@ typedef struct dt_iop_module_so_t
   int (*flags)(void);
   /** Returns IOP tags (combination of dt_iop_tags_t). */
   int (*operation_tags)(void);
+
+  /* ── Module lifecycle callbacks ─────────────────────────────────────────
+   * These are populated by init_global() (or equivalent) at registration
+   * time and copied into each dt_iop_module_t instance by create.c.
+   * All are optional: check for NULL before calling.
+   */
+
+  /** Called once per module instance after allocation (populate default params). */
+  void (*init)(struct dt_iop_module_t *self);
+
+  /** Called once per pipeline node — allocates piece->data. */
+  void (*init_pipe)(struct dt_iop_module_t *self,
+                    struct dt_dev_pixelpipe_t *pipe,
+                    struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Called when the pipeline is torn down — frees piece->data. */
+  void (*cleanup_pipe)(struct dt_iop_module_t *self,
+                       struct dt_dev_pixelpipe_t *pipe,
+                       struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Called before each render — copies/transforms module->params into piece->data. */
+  void (*commit_params)(struct dt_iop_module_t *self,
+                        dt_iop_params_t *params,
+                        struct dt_dev_pixelpipe_t *pipe,
+                        struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Return colorspace that this module requires for its input. */
+  int (*input_colorspace)(struct dt_iop_module_t *self,
+                          struct dt_dev_pixelpipe_t *pipe,
+                          struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Return colorspace that this module produces on output. */
+  int (*output_colorspace)(struct dt_iop_module_t *self,
+                           struct dt_dev_pixelpipe_t *pipe,
+                           struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Populate output buffer descriptor (e.g. demosaic: 1ch Bayer → 4ch RGBA). */
+  void (*output_format)(struct dt_iop_module_t *self,
+                        struct dt_dev_pixelpipe_t *pipe,
+                        struct dt_dev_pixelpipe_iop_t *piece,
+                        struct dt_iop_buffer_dsc_t *dsc);
+
+  /** Compute required input ROI from desired output ROI. */
+  void (*modify_roi_in)(struct dt_iop_module_t *self,
+                        struct dt_dev_pixelpipe_iop_t *piece,
+                        const dt_iop_roi_t *roi_out,
+                        dt_iop_roi_t *roi_in);
+
+  /** Compute output ROI from input ROI. */
+  void (*modify_roi_out)(struct dt_iop_module_t *self,
+                         struct dt_dev_pixelpipe_iop_t *piece,
+                         dt_iop_roi_t *roi_out,
+                         const dt_iop_roi_t *roi_in);
 } dt_iop_module_so_t;
 
 /* Helper: check if a module's so matches a given op name */
@@ -1031,6 +1084,24 @@ typedef struct dt_iop_module_t
   int  multi_priority;
   char multi_name[128];
   bool multi_name_hand_edited;
+
+  /* ── Module lifecycle callbacks (copied from so by create.c) ─────────── */
+
+  /** Called once per pipeline node — allocates piece->data. */
+  void (*init_pipe)(struct dt_iop_module_t *self,
+                    struct dt_dev_pixelpipe_t *pipe,
+                    struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Called when the pipeline is torn down — frees piece->data. */
+  void (*cleanup_pipe)(struct dt_iop_module_t *self,
+                       struct dt_dev_pixelpipe_t *pipe,
+                       struct dt_dev_pixelpipe_iop_t *piece);
+
+  /** Called before each render — copies/transforms module->params into piece->data. */
+  void (*commit_params)(struct dt_iop_module_t *self,
+                        dt_iop_params_t *params,
+                        struct dt_dev_pixelpipe_t *pipe,
+                        struct dt_dev_pixelpipe_iop_t *piece);
 
   /** CPU process function pointer (mirrors so->process_plain). */
   void (*process_plain)(struct dt_iop_module_t *self,
@@ -1562,6 +1633,267 @@ static inline bool dt_iop_module_is_skipped(const void *dev,
   (void)dev; (void)mod;
   return false; /* no skip logic in headless mode */
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * GLib / Darktable Compatibility Layer (Task 8.2)
+ *
+ * Provides the minimum set of GLib types, macros, and darktable utility
+ * functions required to compile Tier 1 IOP modules without modification.
+ * All definitions are additive — no existing definitions are changed.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── GLib basic types ────────────────────────────────────────────────────── */
+
+#ifndef GLIB_MAJOR_VERSION  /* only define if real GLib is not present */
+
+typedef int          gboolean;
+typedef int          gint;
+typedef unsigned int guint;
+typedef char         gchar;
+typedef float        gfloat;
+typedef double       gdouble;
+typedef void *       gpointer;
+typedef const void * gconstpointer;
+typedef long         glong;
+typedef unsigned long gulong;
+
+#ifndef TRUE
+#  define TRUE  1
+#endif
+#ifndef FALSE
+#  define FALSE 0
+#endif
+
+/* g_strlcpy: copy at most dst_size-1 bytes, always NUL-terminate */
+#include <string.h>
+static inline gchar *g_strlcpy(gchar *dst, const gchar *src, gint dst_size)
+{
+  if(dst_size <= 0) return dst;
+  strncpy(dst, src, (size_t)(dst_size - 1));
+  dst[dst_size - 1] = '\0';
+  return dst;
+}
+
+/* g_strlcat: append at most dst_size-strlen(dst)-1 bytes */
+static inline gchar *g_strlcat(gchar *dst, const gchar *src, gint dst_size)
+{
+  if(dst_size <= 0) return dst;
+  size_t dlen = strlen(dst);
+  if((int)dlen >= dst_size - 1) return dst;
+  strncat(dst, src, (size_t)(dst_size - 1 - dlen));
+  dst[dst_size - 1] = '\0';
+  return dst;
+}
+
+/* g_snprintf: same as snprintf */
+#include <stdio.h>
+#define g_snprintf snprintf
+
+/* g_strdup: strdup wrapper */
+static inline gchar *g_strdup(const gchar *s)
+{
+  if(!s) return NULL;
+  return strdup(s);
+}
+
+/* g_free: free wrapper */
+static inline void g_free(gpointer p) { free(p); }
+
+/* g_malloc0: calloc wrapper */
+static inline gpointer g_malloc0(gint size)
+{
+  if(size <= 0) return NULL;
+  return calloc(1, (size_t)size);
+}
+
+/* MIN / MAX / CLAMP (GLib style) */
+#ifndef MIN
+#  define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#  define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef CLAMP
+#  define CLAMP(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))
+#endif
+
+#endif /* GLIB_MAJOR_VERSION */
+
+/* ── Gettext no-ops ──────────────────────────────────────────────────────── */
+
+#ifndef _
+#  define _(s)         (s)
+#endif
+#ifndef N_
+#  define N_(s)        (s)
+#endif
+#ifndef C_
+#  define C_(ctx, s)   (s)
+#endif
+#ifndef NC_
+#  define NC_(ctx, s)  (s)
+#endif
+
+/* ── Darktable logging stubs ─────────────────────────────────────────────── */
+
+#include <stdarg.h>
+
+static inline void dt_control_log(const char *fmt, ...)
+{
+  /* No-op in headless mode.  Uncomment for debugging:
+  va_list ap; va_start(ap, fmt); vfprintf(stderr, fmt, ap); va_end(ap); fputc('\n', stderr);
+  */
+  (void)fmt;
+}
+
+static inline void dt_iop_set_module_trouble_message(
+  struct dt_iop_module_t *self,
+  const char *msg,
+  const char *tooltip,
+  const char *stderr_msg)
+{
+  (void)self; (void)msg; (void)tooltip;
+  if(stderr_msg) fprintf(stderr, "dtpipe trouble: %s\n", stderr_msg);
+}
+
+/* ── Image query helpers ─────────────────────────────────────────────────── */
+
+static inline gboolean dt_image_is_raw(const dt_image_t *img)
+{
+  return (img->flags & DT_IMAGE_RAW) != 0;
+}
+
+static inline gboolean dt_image_is_monochrome(const dt_image_t *img)
+{
+  return (img->flags & DT_IMAGE_MONOCHROME) != 0;
+}
+
+static inline gboolean dt_image_is_rawprepare_supported(const dt_image_t *img)
+{
+  return dt_image_is_raw(img);
+}
+
+static inline gboolean dt_image_is_ldr(const dt_image_t *img)
+{
+  return (img->flags & DT_IMAGE_LDR) != 0;
+}
+
+static inline gboolean dt_image_is_hdr(const dt_image_t *img)
+{
+  return (img->flags & DT_IMAGE_HDR) != 0;
+}
+
+/* ── Config stubs ────────────────────────────────────────────────────────── */
+
+static inline const char *dt_conf_get_string_const(const char *key)
+{
+  (void)key;
+  return "";
+}
+
+static inline gboolean dt_conf_get_bool(const char *key)
+{
+  (void)key;
+  return FALSE;
+}
+
+static inline int dt_conf_get_int(const char *key)
+{
+  (void)key;
+  return 0;
+}
+
+static inline float dt_conf_get_float(const char *key)
+{
+  (void)key;
+  return 0.0f;
+}
+
+/* ── IOP description stub (for dt_iop_module_so_t*) ─────────────────────── */
+/*
+ * Note: a version taking dt_iop_module_t* already exists above (returns
+ * const char**).  This overload for dt_iop_module_so_t* matches the signature
+ * used by many IOPs in their init_global() bodies.
+ */
+static inline void dt_iop_set_description_so(
+  struct dt_iop_module_so_t *so,
+  const char *main_text,
+  const char *purpose,
+  const char *input,
+  const char *process,
+  const char *output)
+{
+  (void)so; (void)main_text; (void)purpose;
+  (void)input; (void)process; (void)output;
+}
+
+/* ── GUI preset stubs ────────────────────────────────────────────────────── */
+
+static inline void dt_gui_presets_add_generic(const char *name, ...)
+{
+  (void)name;
+}
+
+#ifndef BUILTIN_PRESET
+#  define BUILTIN_PRESET(...) do { } while(0)
+#endif
+
+/* ── dt_dev_chroma_t ─────────────────────────────────────────────────────── */
+/*
+ * White-balance / chromatic adaptation state stored on the develop object.
+ * Referenced by temperature.c and highlights.c.
+ */
+typedef struct dt_dev_chroma_t
+{
+  float D65coeffs[4];  /* D65 white balance coefficients */
+  float as_shot[4];    /* as-shot white balance coefficients */
+  float wb_coeffs[4];  /* final white balance coefficients used by demosaic */
+  int   adaptation;    /* chromatic adaptation mode */
+  int   mode;          /* white balance mode */
+  int   late_correction; /* 1 if D65-late preset is in use (temperature.c) */
+} dt_dev_chroma_t;
+
+/* ── dt_develop_t ────────────────────────────────────────────────────────── */
+/*
+ * Minimal develop object.  module->dev points to this in real darktable.
+ * In libdtpipe each dt_pipe_t owns one of these; it is populated from
+ * the dt_image_t at pipeline creation time.
+ *
+ * Only the fields actually accessed by Tier 1 IOPs are included.
+ */
+typedef struct dt_develop_t
+{
+  dt_image_t      image_storage; /* snapshot of image metadata */
+  dt_dev_chroma_t chroma;        /* white balance / chromatic adaptation */
+} dt_develop_t;
+
+/* ── Scene-referred mode stub ────────────────────────────────────────────── */
+
+static inline gboolean dt_is_scene_referred(void)
+{
+  return TRUE; /* always scene-referred in libdtpipe */
+}
+
+/* ── Signal / debug no-ops ───────────────────────────────────────────────── */
+
+#ifndef DT_DEBUG_CONTROL_SIGNAL_RAISE
+#  define DT_DEBUG_CONTROL_SIGNAL_RAISE(...) do { } while(0)
+#endif
+
+/* ── Additional math/utility stubs used by IOPs ──────────────────────────── */
+
+/* INFINITY / NAN convenience (should be available from <math.h> but guard anyway) */
+#ifndef DT_NAN
+#  define DT_NAN __builtin_nanf("")
+#endif
+
+/* sqrtf guard: already provided by <math.h>; just ensure log2f is available */
+/* (These are part of C99/C11 so should always be present.) */
+
+/* dt_sse_* placeholders so IOPs that conditionally use SSE don't need guards */
+#define dt_sse2_supported() 0
+
+/* ── END GLib / Darktable Compatibility Layer ────────────────────────────── */
 
 #ifdef __cplusplus
 } /* extern "C" */

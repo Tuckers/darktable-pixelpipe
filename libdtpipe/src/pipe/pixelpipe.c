@@ -98,16 +98,18 @@ void dt_dev_pixelpipe_cleanup_nodes(dt_dev_pixelpipe_t *pipe)
 
     dt_dev_pixelpipe_iop_t *piece = &node->piece;
 
-    /* Free per-pipe module data if the module provided a cleanup function. */
-    /* cleanup_pipe() is added in Part 2 when module function tables exist. */
+    /* Call cleanup_pipe() if the module provided one — this is where the
+       module frees any data it allocated in init_pipe(). */
+    if(piece->module && piece->module->cleanup_pipe)
+      piece->module->cleanup_pipe(piece->module, pipe, piece);
+
+    /* Safety: free piece->data if cleanup_pipe() didn't (stub modules). */
+    free(piece->data);
+    piece->data = NULL;
 
     /* Free blending data */
     free(piece->blendop_data);
     piece->blendop_data = NULL;
-
-    /* Free per-pipe private data */
-    free(piece->data);
-    piece->data = NULL;
 
     free(node);
     node = next;
@@ -439,12 +441,22 @@ static bool _process_rec(dt_dev_pixelpipe_t *pipe,
     if(dt_pipe_shutdown(pipe))
       return true;
 
-    /* The input buffer is always float RGBA (4 channels) — ensure the
-       output format descriptor reflects this so callers compute correct
-       buffer sizes. */
-    (**out_format).channels = 4;
-    (**out_format).datatype = TYPE_FLOAT;
-    (**out_format).cst      = IOP_CS_RGB;
+    /* The input buffer format is set by pipe->dsc (initialized from image
+       metadata in dtpipe_create).  For raw images this is 1-channel Bayer;
+       for non-raw it is 4-channel float RGBA.  Always reflect what dsc says. */
+    if(pipe->dsc.channels > 0)
+    {
+      (**out_format).channels = pipe->dsc.channels;
+      (**out_format).datatype = pipe->dsc.datatype;
+      (**out_format).cst      = pipe->dsc.cst;
+    }
+    else
+    {
+      /* Fallback: no dsc set, default to 4-channel RGB */
+      (**out_format).channels = 4;
+      (**out_format).datatype = TYPE_FLOAT;
+      (**out_format).cst      = IOP_CS_RGB;
+    }
 
     const size_t bpp     = dt_iop_buffer_dsc_to_bpp(*out_format);
     const size_t bufsize = (size_t)bpp * roi_out->width * roi_out->height;
@@ -531,10 +543,6 @@ static bool _process_rec(dt_dev_pixelpipe_t *pipe,
     return _process_rec(pipe, output, out_format, roi_out, prev_skip, pos - 1);
   }
 
-  /* Determine output format */
-  const size_t bpp     = dt_iop_buffer_dsc_to_bpp(*out_format);
-  const size_t bufsize = (size_t)bpp * roi_out->width * roi_out->height;
-
   /* Check shutdown / cache */
   if(dt_pipe_shutdown(pipe))
     return true;
@@ -565,7 +573,10 @@ static bool _process_rec(dt_dev_pixelpipe_t *pipe,
 
   const size_t in_bpp = dt_iop_buffer_dsc_to_bpp(input_format);
 
-  /* Propagate buffer descriptor through the piece */
+  /* Propagate buffer descriptor through the piece, then let the module
+     declare its output format (e.g. demosaic: 1-ch RAW → 4-ch RGB).
+     bufsize MUST be computed after output_format() so that format-changing
+     modules (like demosaic) get a correctly-sized output buffer. */
   piece->dsc_out = piece->dsc_in = *input_format;
 
   if(module->output_format)
@@ -573,7 +584,10 @@ static bool _process_rec(dt_dev_pixelpipe_t *pipe,
 
   **out_format = pipe->dsc = piece->dsc_out;
 
-  /* Allocate output buffer */
+  /* Allocate output buffer — sized using the POST-output_format bpp */
+  const size_t bpp     = dt_iop_buffer_dsc_to_bpp(*out_format);
+  const size_t bufsize = (size_t)bpp * roi_out->width * roi_out->height;
+
   if(dt_pipe_shutdown(pipe))
     return true;
 
@@ -630,6 +644,12 @@ static bool _process_rec(dt_dev_pixelpipe_t *pipe,
 
   piece->module->position = pos;
 
+  /* ── Commit params ───────────────────────────────────────────────────── */
+  /* Call commit_params() to copy/transform module->params into piece->data.
+     This must happen before process() so piece->data reflects current params. */
+  if(module->commit_params)
+    module->commit_params(module, module->params, pipe, piece);
+
   /* ── CPU processing ──────────────────────────────────────────────────── */
   if(_process_on_cpu(pipe, (float *)input, input_format, &roi_in,
                      output, out_format, roi_out,
@@ -677,10 +697,21 @@ bool dt_dev_pixelpipe_process(dt_dev_pixelpipe_t *pipe,
   dt_iop_buffer_dsc_t _out_format = { 0 };
   dt_iop_buffer_dsc_t *out_format  = &_out_format;
 
-  /* Initial output format: float RGBA (4 channels) */
-  _out_format.channels = 4;
-  _out_format.datatype = TYPE_FLOAT;
-  _out_format.cst      = IOP_CS_RGB;
+  /* Initial output format: taken from pipe->dsc which was set from image
+     metadata in dtpipe_create().  For raw images: 1-channel Bayer (RAW).
+     For non-raw or unset: fall back to 4-channel float RGB. */
+  if(pipe->dsc.channels > 0)
+  {
+    _out_format.channels = pipe->dsc.channels;
+    _out_format.datatype = pipe->dsc.datatype;
+    _out_format.cst      = pipe->dsc.cst;
+  }
+  else
+  {
+    _out_format.channels = 4;
+    _out_format.datatype = TYPE_FLOAT;
+    _out_format.cst      = IOP_CS_RGB;
+  }
 
   /* Walk list to find the last (tail) node */
   _pipe_node_t *tail = (_pipe_node_t *)pipe->nodes;

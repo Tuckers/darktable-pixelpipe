@@ -76,48 +76,54 @@ bool dtpipe_ensure_input_buf(dt_pipe_t *pipe)
     return false;
   }
 
-  float *buf = dt_alloc_align_float((size_t)W * H * 4);
+  /*
+   * For RAW images the pipeline expects a 1-channel float Bayer buffer as
+   * input (rawprepare subtracts black levels, demosaic interpolates to RGB).
+   * For non-RAW (JPEG/TIFF) we use 4-channel float RGBA.
+   *
+   * Raw buffer formats:
+   *   bpp == 2  →  uint16_t Bayer samples, normalise by raw_white_point
+   *   bpp == 4  →  float Bayer samples (e.g. from some DNG decoders)
+   */
+  const gboolean is_raw = dt_image_is_raw(img);
+  const int channels = is_raw ? 1 : 4;
+
+  float *buf = dt_alloc_align_float((size_t)W * H * channels);
   if(!buf)
   {
     fprintf(stderr, "[dtpipe/render] out of memory allocating input buffer\n");
     return false;
   }
 
-  /*
-   * Unpack raw pixels to float-RGBA.
-   *
-   * The raw buffer may be:
-   *   bpp == 2  →  uint16_t samples, normalise by raw_white_point
-   *   bpp == 4  →  float samples (already in some linear range)
-   *
-   * We place the single raw channel value in all four RGBA slots so the
-   * result is a greyscale mosaic visible without demosaicing.  When the
-   * rawprepare + demosaic modules are wired up, this stub becomes unused.
-   */
-  const float wp = img->raw_white_point > 0
-                     ? (float)img->raw_white_point
-                     : 65535.0f;
-
-  if(img->bpp == 2)
+  if(is_raw)
   {
-    const uint16_t *src = (const uint16_t *)img->pixels;
-    DT_OMP_FOR()
-    for(int i = 0; i < W * H; i++)
+    /* 1-channel Bayer: copy directly into a float buffer (no colour replication) */
+    const float wp = img->raw_white_point > 0
+                       ? (float)img->raw_white_point
+                       : 65535.0f;
+    if(img->bpp == 2)
     {
-      const float v = (float)src[i] / wp;
-      buf[4 * i + 0] = v;
-      buf[4 * i + 1] = v;
-      buf[4 * i + 2] = v;
-      buf[4 * i + 3] = 1.0f;
+      const uint16_t *src = (const uint16_t *)img->pixels;
+      DT_OMP_FOR()
+      for(int i = 0; i < W * H; i++)
+        buf[i] = (float)src[i] / wp;
+    }
+    else /* float raw */
+    {
+      const float *src = (const float *)img->pixels;
+      DT_OMP_FOR()
+      for(int i = 0; i < W * H; i++)
+        buf[i] = src[i];
     }
   }
-  else /* bpp == 4: raw float */
+  else
   {
+    /* Non-RAW: replicate single channel to RGBA for passthrough */
     const float *src = (const float *)img->pixels;
     DT_OMP_FOR()
     for(int i = 0; i < W * H; i++)
     {
-      const float v = src[i];
+      const float v = src ? src[i] : 0.0f;
       buf[4 * i + 0] = v;
       buf[4 * i + 1] = v;
       buf[4 * i + 2] = v;
@@ -175,6 +181,14 @@ static dt_render_result_t *_do_render(dt_pipe_t *pipe,
   /* Ensure float-RGBA input buffer exists */
   if(!dtpipe_ensure_input_buf(pipe))
     return NULL;
+
+  /* Reset pipe->pipe.dsc to the initial image format before each render.
+     Format-changing modules (rawprepare, demosaic) mutate pipe->pipe.dsc
+     in-place during processing.  Without this reset, the second render
+     would start with the post-pipeline format (4-ch RGB) as its input
+     format, causing rawprepare to skip its branch and demosaic to receive
+     the wrong descriptor. */
+  pipe->pipe.dsc = pipe->initial_dsc;
 
   /* Attach input to the underlying pixelpipe */
   const int full_w = pipe->input_width;

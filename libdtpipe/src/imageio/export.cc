@@ -107,6 +107,12 @@ static const float *_run_pipeline(dt_pipe_t *pipe, int *out_w, int *out_h)
   if(!dtpipe_ensure_input_buf(pipe))
     return NULL;
 
+  /* Reset pipe->pipe.dsc to the initial image format before each render.
+     Format-changing modules (rawprepare, demosaic) mutate pipe->pipe.dsc
+     in-place; without this reset the export sees the post-pipeline format
+     from the previous render as its input format. */
+  pipe->pipe.dsc = pipe->initial_dsc;
+
   const int W = pipe->input_width;
   const int H = pipe->input_height;
 

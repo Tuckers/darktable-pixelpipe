@@ -59,6 +59,21 @@ struct dt_pipe_s
   float              *input_buf;
   int                 input_width;
   int                 input_height;
+
+  /*
+   * Minimal develop object — provides module->dev for IOP modules that need
+   * to read image metadata (e.g. rawprepare reads crop/black/white from
+   * image_storage; temperature reads WB coefficients from chroma).
+   * Populated from img at dtpipe_create() time.
+   */
+  dt_develop_t        dev;
+
+  /*
+   * Snapshot of pipe->pipe.dsc at creation time (image input format).
+   * Restored at the start of every render so that format-changing modules
+   * (rawprepare, demosaic) see a clean descriptor on each run.
+   */
+  dt_iop_buffer_dsc_t initial_dsc;
 };
 
 /* ── Helpers exposed to other internal TUs ───────────────────────────────── */

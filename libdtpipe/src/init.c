@@ -130,7 +130,10 @@ static bool _init_opencl(void)
  */
 
 /* --- begin IOP forward declarations (added as modules are ported) ------- */
-/* extern void dt_iop_exposure_init_global(dt_iop_module_so_t *module); */
+extern void dt_iop_exposure_init_global(dt_iop_module_so_t *module);
+extern void dt_iop_rawprepare_init_global(dt_iop_module_so_t *module);
+extern void dt_iop_temperature_init_global(dt_iop_module_so_t *module);
+extern void dt_iop_demosaic_init_global(dt_iop_module_so_t *module);
 /* --- end IOP forward declarations --------------------------------------- */
 
 typedef void (*iop_init_global_fn_t)(dt_iop_module_so_t *);
@@ -148,12 +151,12 @@ typedef struct
  * is left NULL; the pipeline engine skips nodes with a NULL process pointer.
  */
 static const iop_registration_t _iop_registry[] = {
-  { "rawprepare",  NULL },
-  { "demosaic",    NULL },
+  { "rawprepare",  dt_iop_rawprepare_init_global }, /* Task 8.5: real process */
+  { "demosaic",    dt_iop_demosaic_init_global }, /* Task 8.7: PPG + passthrough */
   { "colorin",     NULL },
-  { "exposure",    NULL },
+  { "exposure",    dt_iop_exposure_init_global },   /* Task 8.4: real process */
   { "colorout",    NULL },
-  { "temperature", NULL },
+  { "temperature", dt_iop_temperature_init_global }, /* Task 8.6: real process */
   { "highlights",  NULL },
   { "sharpen",     NULL },
 };

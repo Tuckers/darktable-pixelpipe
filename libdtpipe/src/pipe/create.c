@@ -91,7 +91,7 @@ typedef struct _so_node_t
  * Returns the head of the module list, or NULL if darktable.iop is empty or
  * memory allocation fails.
  */
-static _module_node_t *_build_module_list(void)
+static _module_node_t *_build_module_list(dt_develop_t *dev)
 {
   /* Get the canonical v5.0 order list */
   dt_iop_order_list_t order_list =
@@ -150,6 +150,18 @@ static _module_node_t *_build_module_list(void)
     m->flags           = so->flags;
     m->operation_tags  = so->operation_tags;
 
+    /* Mirror lifecycle callbacks from the so */
+    m->init_pipe      = so->init_pipe;
+    m->cleanup_pipe   = so->cleanup_pipe;
+    m->commit_params  = so->commit_params;
+
+    /* Mirror colorspace/format/ROI callbacks from the so */
+    m->input_colorspace  = so->input_colorspace;
+    m->output_colorspace = so->output_colorspace;
+    m->output_format     = so->output_format;
+    m->modify_roi_in     = so->modify_roi_in;
+    m->modify_roi_out    = so->modify_roi_out;
+
     /* Default enabled state */
     m->default_enabled = _is_default_enabled(op);
     m->enabled         = m->default_enabled;
@@ -163,6 +175,15 @@ static _module_node_t *_build_module_list(void)
       m->default_params = (dt_iop_params_t *)calloc(1, psz);
       m->params_size    = (int32_t)psz;
     }
+
+    /* Set module->dev so that init() can read image metadata (crop extents,
+     * black/white levels, WB coefficients, etc.). */
+    m->dev = (void *)dev;
+
+    /* Call so->init() if available — populates default params and any
+     * per-instance data.  Must run after params buffer is allocated. */
+    if(so->init)
+      so->init(m);
 
     /* Initialise the gui_lock even though we never use it (code may lock it) */
     dt_pthread_mutex_init(&m->gui_lock);
@@ -255,6 +276,24 @@ dt_pipe_t *dtpipe_create(dt_image_t *img)
   /* Store image reference (borrowed) */
   pipe->img = img;
 
+  /* Populate the minimal develop object so IOP modules can access image
+   * metadata through module->dev (e.g. rawprepare reads crop/black/white,
+   * temperature reads WB coefficients). */
+  memset(&pipe->dev, 0, sizeof(pipe->dev));
+  pipe->dev.image_storage = *img; /* shallow copy; pixel buffer is NOT owned */
+  /* wb_coeffs default: neutral 1.0 for all channels */
+  pipe->dev.chroma.wb_coeffs[0] = 1.0f;
+  pipe->dev.chroma.wb_coeffs[1] = 1.0f;
+  pipe->dev.chroma.wb_coeffs[2] = 1.0f;
+  pipe->dev.chroma.wb_coeffs[3] = 1.0f;
+  /* Populate as-shot WB from the image's raw WB coefficients if available */
+  for(int i = 0; i < 4; i++)
+  {
+    pipe->dev.chroma.as_shot[i] = img->wb_coeffs[i] > 0.0f ? img->wb_coeffs[i] : 1.0f;
+    pipe->dev.chroma.wb_coeffs[i] = pipe->dev.chroma.as_shot[i];
+    pipe->dev.chroma.D65coeffs[i] = 1.0f;
+  }
+
   /* Initialise the underlying pixelpipe engine */
   if(!dt_dev_pixelpipe_init(&pipe->pipe))
   {
@@ -271,8 +310,10 @@ dt_pipe_t *dtpipe_create(dt_image_t *img)
   /* Copy image metadata snapshot into the pixelpipe */
   pipe->pipe.image = *img; /* shallow copy — pixels pointer is NOT owned here */
 
-  /* Build the ordered module instance list */
-  pipe->modules = _build_module_list();
+  /* Build the ordered module instance list.  Pass &pipe->dev so that
+   * module->dev is set before so->init() is called (rawprepare reads
+   * crop/black/white from dev->image_storage in its init()). */
+  pipe->modules = _build_module_list(&pipe->dev);
 
   /*
    * Point pipe.iop at the module list so the node-building code can iterate
@@ -298,11 +339,53 @@ dt_pipe_t *dtpipe_create(dt_image_t *img)
               "[dtpipe_create] failed to add node for module '%s'\n",
               mn->module.op);
       /* Non-fatal: continue building remaining nodes */
+      continue;
     }
+
+    /* Call init_pipe() to allocate piece->data for this module. */
+    if(mn->module.init_pipe)
+      mn->module.init_pipe(&mn->module, &pipe->pipe, piece);
   }
 
   /* Set pipe.iop for any code that walks it (future use) */
   pipe->pipe.iop = (void *)pipe->modules;
+
+  /* ── Initialize pipe->dsc from image metadata ─────────────────────────
+   * The pipeline's buffer descriptor (dsc) must reflect the actual input
+   * format before any module runs.  For raw images this is 1-channel Bayer;
+   * the demosaic module's output_format() will update it to 4-channel RGB.
+   * Without this, the base case in _process_rec() produces wrong buffer
+   * sizes for rawprepare and demosaic.
+   */
+  const gboolean is_raw = dt_image_is_raw(img);
+  if(is_raw)
+  {
+    pipe->pipe.dsc.channels = 1;
+    pipe->pipe.dsc.datatype = TYPE_FLOAT;
+    pipe->pipe.dsc.cst      = IOP_CS_RAW;
+    pipe->pipe.dsc.filters  = img->buf_dsc.filters;
+    for(int k = 0; k < 6; k++)
+      for(int j = 0; j < 6; j++)
+        pipe->pipe.dsc.xtrans[k][j] = img->buf_dsc.xtrans[k][j];
+    /* Seed processed_maximum from image white point */
+    const float wp = img->raw_white_point > 0 ? (float)img->raw_white_point : 65535.0f;
+    for(int k = 0; k < 3; k++)
+      pipe->pipe.dsc.processed_maximum[k] = 1.0f / wp; /* rawprepare normalises to [0,1] */
+  }
+  else
+  {
+    pipe->pipe.dsc.channels = 4;
+    pipe->pipe.dsc.datatype = TYPE_FLOAT;
+    pipe->pipe.dsc.cst      = IOP_CS_RGB;
+    for(int k = 0; k < 3; k++)
+      pipe->pipe.dsc.processed_maximum[k] = 1.0f;
+  }
+
+  /* Save the initial dsc so each render can reset pipe->pipe.dsc before
+     processing.  Format-changing modules (rawprepare, demosaic) mutate
+     pipe->pipe.dsc in-place; without a reset the second render sees the
+     post-demosaic format (4-ch RGB) as the input format. */
+  pipe->initial_dsc = pipe->pipe.dsc;
 
   return pipe;
 }

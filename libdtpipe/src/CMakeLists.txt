@@ -11,6 +11,11 @@ set(DTPIPE_SOURCES
   history/xmp_write.cc
   imageio/load.cc
   imageio/export.cc
+  # Phase 8: real IOP modules (Tier 1)
+  iop/exposure.c
+  iop/rawprepare.c
+  iop/temperature.c
+  iop/demosaic.c
 )
 
 add_library(dtpipe SHARED ${DTPIPE_SOURCES})

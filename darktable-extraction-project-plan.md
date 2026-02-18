@@ -1613,7 +1613,7 @@ Set up/tear down test fixtures properly.
 
 ### Task 8.1: Extend Pipeline Engine for Real Modules
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `libdtpipe/src/pipe/pixelpipe.c`, `libdtpipe/src/pipe/create.c`, `libdtpipe/src/dtpipe_internal.h`
 - **Output:** Updated engine that calls `init_pipe()`, `commit_params()`, `cleanup_pipe()`, and supports colorspace transitions and `output_format()`
 
@@ -1712,7 +1712,7 @@ All 9 existing tests pass. The engine now has the infrastructure for real module
 
 ### Task 8.2: Add GLib/Darktable Compatibility Layer to dtpipe_internal.h
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `libdtpipe/src/dtpipe_internal.h`, darktable source headers
 - **Output:** Updated `dtpipe_internal.h` with compatibility typedefs, macros, and stub functions
 
@@ -1818,7 +1818,7 @@ Verify with: cmake --build libdtpipe/build-release -j8
 
 ### Task 8.3: Port IOP Math and Utility Helpers
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/develop/imageop_math.h`, `src/common/imagebuf.h`, `src/common/math.h`
 - **Output:** `libdtpipe/src/iop/iop_math.h` — self-contained header with ported math functions
 
@@ -1877,13 +1877,22 @@ Then create a clean, self-contained iop_math.h. Test: the header should
 compile when included after dtpipe_internal.h.
 ```
 
-**Verification:** `echo '#include "dtpipe_internal.h"\n#include "iop/iop_math.h"' | gcc -fsyntax-only -x c -` compiles without errors.
+**Implementation notes:**
+- `dt_iop_image_copy` and `dt_iop_image_copy_by_size` were already in `dtpipe_internal.h`; only a comment placeholder is emitted to avoid redefinition errors.
+- `dt_iop_clip_and_zoom_roi` delegates to the existing `dt_iop_clip_and_zoom` in `dtpipe_internal.h`.
+- `default_tiling_callback` provided as alias for `dt_iop_default_tiling_callback` (already in `dtpipe_internal.h`).
+- `dt_iop_alloc_image_buffers` is a variadic implementation supporting all `DT_IMGSZ_*` flags including `DT_IMGSZ_PERTHREAD` and `DT_IMGSZ_CLEARBUF`.
+- `dt_iop_have_required_input_format` copies input→output and prints a warning on mismatch (returns 0/FALSE).
+- Raw Bayer downscale helpers (`dt_iop_clip_and_zoom_mosaic_half_size_f`, `dt_iop_clip_and_zoom_demosaic_half_size_f`, `dt_iop_clip_and_zoom_demosaic_passthrough_monochrome_f`) included for demosaic needs.
+- `max3f`, `min3f`, `max4f` from `src/common/dttypes.h` included.
+- All `dt_vector_*` pixel helpers from `src/common/math.h` included.
+- Verified: `clang -fsyntax-only -x c -` compiles without errors. All 13 existing tests still pass (0 failures).
 
 ---
 
 ### Task 8.4: Port exposure.c (Template Module)
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/iop/exposure.c` (GUI-stripped), `libdtpipe/src/iop/iop_math.h`
 - **Output:** `libdtpipe/src/iop/exposure.c` — compiles and processes pixels
 
@@ -1991,7 +2000,7 @@ Additionally, a rendered image should now show exposure adjustment when exposure
 
 ### Task 8.5: Port rawprepare.c
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/iop/rawprepare.c` (GUI-stripped)
 - **Output:** `libdtpipe/src/iop/rawprepare.c`
 
@@ -2035,13 +2044,30 @@ unmodified filters value may suffice initially.
 Read: src/iop/rawprepare.c, src/common/rawspeed_glue.c (for crop_dcraw_filters)
 ```
 
-**Verification:** Compiles, tests pass, rawprepare correctly normalizes the raw data (black subtraction + scaling).
+**Implementation notes:**
+- All internal functions (`process`, `commit_params`, `init_pipe`, `cleanup_pipe`, `init`, `output_format`, `modify_roi_in`, `modify_roi_out`) made `static` to avoid duplicate-symbol linker errors when multiple IOP .c files are compiled into the same shared library. Same fix applied to `exposure.c`.
+- `dt_rawspeed_crop_dcraw_filters` implemented as a static helper `_crop_dcraw_filters` inside rawprepare.c — rotates the 8-bit Bayer descriptor by `(cx & 1, cy & 1)` and replicates to all 4 bytes of the 32-bit filter word.
+- `init()` reads `module->dev->image_storage` for crop extents and black/white levels (populated from the loaded RAF by `dtpipe_create`). Falls back to neutral defaults (no crop, black=0, white=65535) when `dev` is NULL.
+- `dt_develop_t dev` added to `struct dt_pipe_s` (`pipe/create.h`) and populated in `dtpipe_create()` from the source image before `_build_module_list()` is called.
+- `_build_module_list()` now takes a `dt_develop_t *dev` parameter and sets `m->dev = dev` before calling `so->init(m)` — ensures rawprepare's `init()` sees the correct crop/black/white data.
+- GainMap support removed entirely (requires `g_list_nth_data` / DNG infrastructure not present in libdtpipe). `apply_gainmaps` is always FALSE.
+- Database calls (`_image_set_rawcrops`, `dt_image_cache_get`) removed; `p_width`/`p_height` on the image are not updated (harmless — pipeline uses ROI extents directly).
+- `commit_params()` disables the piece for non-raw images (`!dt_image_is_rawprepare_supported`); guards divisors against zero.
+- `output_format()` writes `dsc->rawprepare.{raw_black_level, raw_white_point}` from `piece->data`.
+- `modify_roi_out()` / `modify_roi_in()` adjust ROI for left/top/right/bottom sensor crop scaled by `roi->scale / piece->iscale`.
+
+**Verification:**
+```bash
+cmake --build libdtpipe/build-release -j8   # compiles without errors or warnings
+cd libdtpipe/build-release && ctest --output-on-failure  # 13/13 tests, 99 checks, 0 failures
+```
+`rawprepare` no longer appears in the "[pixelpipe] module 'X' has no process function" log. Remaining stubs: `demosaic`, `colorin`, `colorout`.
 
 ---
 
 ### Task 8.6: Port temperature.c
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/iop/temperature.c` (GUI-stripped)
 - **Output:** `libdtpipe/src/iop/temperature.c`
 
@@ -2049,45 +2075,30 @@ Read: src/iop/rawprepare.c, src/common/rawspeed_glue.c (for crop_dcraw_filters)
 
 Temperature (white balance) applies per-channel multipliers to the raw Bayer data. It operates in IOP_CS_RAW. The process function is simple (per-pixel channel multiply), but `commit_params()` is complex — it converts color temperature / tint into per-channel coefficients using the camera's color matrix.
 
-**Claude Code Prompt:**
+**Implementation notes:**
+- All internal functions (`process`, `commit_params`, `init_pipe`, `cleanup_pipe`, `init`, `input_colorspace`, `output_colorspace`) are `static` — required to avoid duplicate-symbol linker errors in libdtpipe's single dylib.
+- No OpenCL, no lcms2/color-matrix temperature-tint conversion, no `reload_defaults()` complexity, no wb_presets database lookup — these are deferred to later tasks.
+- `process()` keeps all three code paths from darktable: X-Trans (filters==9), Bayer (filters!=0), and non-mosaiced (filters==0). Uses `FC()` and `FCxtrans()` from `iop_math.h`.
+- `init()` reads `dev->image_storage.wb_coeffs[]` if they are finite and non-zero, normalises so green == 1.0, falls back to neutral 1.0 coefficients otherwise.
+- `commit_params()` copies the four channel multipliers from params to `piece->data` and guards against zero coefficients (replaces with 1.0). Updates `dev->chroma.wb_coeffs[]` for downstream modules.
+- `_publish_chroma()` writes applied coefficients back to `pipe->dsc.temperature` and `dev->chroma.wb_coeffs`, and scales `dsc.processed_maximum[]`. Guards against NULL dev.
+- `dt_dev_chroma_t` extended with `late_correction` field (needed by temperature; added to `dtpipe_internal.h`).
+- `colorspace()` functions return `IOP_CS_RAW` by default; fall back to `IOP_CS_RGB` if the piece's input was already non-raw (handles non-RAW image paths).
+- Registered in `init.c` `_iop_registry[]` with `dt_iop_temperature_init_global`. Forward declaration added.
+- Added to `src/CMakeLists.txt` DTPIPE_SOURCES under `# Phase 8: real IOP modules (Tier 1)`.
+
+**Verification:**
+```bash
+cmake --build libdtpipe/build-release --target dtpipe -j8  # compiles without errors
+cd libdtpipe/build-release && ctest --output-on-failure    # 13/13 tests, 0 failures
 ```
-Port src/iop/temperature.c into libdtpipe/src/iop/temperature.c.
-
-Key characteristics:
-- Operates on IOP_CS_RAW (before demosaic)
-- process() is simple: multiply each pixel by its channel's coefficient
-  using the FC() macro to determine which coefficient to apply
-- commit_params() converts temperature/tint to per-channel multipliers
-  using camera color matrices from EXIF data and dt_dev_chroma_t
-- Uses self->dev->chroma for white balance coefficients
-
-Simplification strategy:
-- Keep process() as-is (simple per-pixel multiply)
-- Simplify commit_params() to use the as-shot white balance coefficients
-  from dev->chroma.as_shot[] as defaults, and allow override via params
-- Remove the complex temperature-to-coefficient conversion that requires
-  color matrices (can be added later)
-- Remove preset logic and reload_defaults()
-- Remove OpenCL code
-
-The init() function should set default params to use as-shot WB (the camera's
-auto white balance from EXIF). This means commit_params() can just copy
-coefficients from dev->chroma into piece->data.
-
-Important: create.c must populate module->dev with a dt_develop_t* that has
-chroma.as_shot[] filled from the loaded image's EXIF WB data. Check how
-dtpipe_load_raw() populates dt_image_t and trace how WB coefficients flow.
-
-Read: src/iop/temperature.c (the process function and commit_params)
-```
-
-**Verification:** Compiles, tests pass, white balance is applied (neutral gray targets should appear neutral).
+`temperature` no longer appears in the "[pixelpipe] module 'X' has no process function" log. Remaining stubs: `demosaic`, `colorin`, `colorout`.
 
 ---
 
 ### Task 8.7: Port demosaic.c (Core Only)
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/iop/demosaic.c` (GUI-stripped), `src/iop/demosaicing/` subdirectory
 - **Output:** `libdtpipe/src/iop/demosaic.c`, `libdtpipe/src/iop/demosaicing/` files
 
@@ -2698,13 +2709,13 @@ Copy this to track completion:
 - [ ] 7.4 Node.js Tests
 
 ### Phase 8: Wire Up Real IOP Processing
-- [ ] 8.1 Extend Pipeline Engine for Real Modules
-- [ ] 8.2 Add GLib/Darktable Compatibility Layer
+- [x] 8.1 Extend Pipeline Engine for Real Modules
+- [x] 8.2 Add GLib/Darktable Compatibility Layer
 - [ ] 8.3 Port IOP Math and Utility Helpers
 - [ ] 8.4 Port exposure.c (Template Module)
 - [ ] 8.5 Port rawprepare.c
 - [ ] 8.6 Port temperature.c
-- [ ] 8.7 Port demosaic.c (Core Only)
+- [x] 8.7 Port demosaic.c (Core Only)
 - [ ] 8.8 Port colorin.c and colorout.c with lcms2
 - [ ] 8.9 Port highlights.c and sharpen.c
 - [ ] 8.10 Wire Up module->dev and White Balance Coefficients
