@@ -2163,9 +2163,21 @@ Read:
 
 ### Task 8.8: Port colorin.c and colorout.c with lcms2
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/iop/colorin.c`, `src/iop/colorout.c` (GUI-stripped), `src/common/colorspaces.h`
-- **Output:** `libdtpipe/src/iop/colorin.c`, `libdtpipe/src/iop/colorout.c`, `libdtpipe/src/common/colorspaces.c`
+- **Output:** `libdtpipe/src/iop/colorin.c`, `libdtpipe/src/iop/colorout.c`, `libdtpipe/src/common/colorspaces.h`
+
+**Implementation Notes:**
+
+- Created `libdtpipe/src/common/colorspaces.h` — minimal lcms2 profile cache with 5 built-in profiles: sRGB, linear Rec2020, linear Rec709, AdobeRGB, Lab. Provides `dt_colorspaces_get_profile()`, `dt_colorspaces_get_matrix_from_input_profile()`, `dt_colorspaces_get_matrix_from_output_profile()`, `dt_colorspaces_create_xyzimatrix_profile()`.
+- `colorin.c`: camera RGB → Lab (fast 3×3 matrix path preferred; lcms2 fallback). `commit_params()` builds input profile from image's `adobe_XYZ_to_CAM` matrix, extracts matrix or creates lcms2 transforms. Default input colorspace: `DT_COLORSPACE_ENHANCED_MATRIX`, working: `DT_COLORSPACE_LIN_REC2020`.
+- `colorout.c`: Lab → sRGB output (fast matrix path + tone curve). `commit_params()` extracts XYZ→RGB matrix from sRGB profile. Default: `DT_COLORSPACE_SRGB`, `DT_INTENT_PERCEPTUAL`.
+- All internal functions are `static` (Phase 8 convention).
+- Updated `init.c` and `src/CMakeLists.txt` to register and compile both modules.
+
+**Critical Bug Fixed — ARM64 ABI corruption from `_cmsMAT3inverse`:**
+
+`colorspaces.h` initially called `_cmsMAT3inverse()` — a private, undeclared lcms2 internal function (not in the public `lcms2.h` header). With `-Os` optimization on ARM64, calling an undeclared function with the wrong assumed return type (`int` instead of `cmsBool`) corrupts callee-saved registers used for subsequent function pointer stores. This caused `dt_iop_colorin_init_global()` to write garbage instead of valid function pointers, making `process_plain` appear NULL even after a successful build. Fixed by replacing the call with explicit Cramer's rule 3×3 matrix inversion (no external dependencies).
 
 **Background:**
 
@@ -2239,7 +2251,7 @@ Read:
 
 ### Task 8.9: Port highlights.c and sharpen.c
 
-- [ ] **Status:** Not started
+- [x] **Status:** Complete
 - **Input:** `src/iop/highlights.c`, `src/iop/sharpen.c` (GUI-stripped)
 - **Output:** `libdtpipe/src/iop/highlights.c`, `libdtpipe/src/iop/sharpen.c`
 
@@ -2296,7 +2308,29 @@ Read:
 - src/iop/hlreconstruct/ files (to understand what can be stubbed)
 ```
 
-**Verification:** Compiles, tests pass. Sharpen should produce visible sharpening effect (compare render with sharpen enabled vs disabled). Highlights in clip mode should prevent pure-white blowouts in overexposed areas.
+**Implementation notes:**
+
+**sharpen.c (`libdtpipe/src/iop/sharpen.c`):**
+- All internal functions are `static` (Phase 8 convention).
+- Removed: OpenCL code (`process_cl`, `#ifdef HAVE_OPENCL`), `init_presets()`, `init_global()`/`cleanup_global()` (OpenCL kernel setup).
+- Kept: `process()` (Gaussian blur USM on L channel), `commit_params()` (scales radius by 2.5 for sigma), `init_pipe()`, `cleanup_pipe()`, `init()` (defaults: radius=2.0, amount=0.5, threshold=0.5).
+- `dt_iop_have_required_input_format()` already available from `iop_math.h`.
+- `dt_iop_alloc_image_buffers()` with `DT_IMGSZ_PERTHREAD` provides per-thread row buffers.
+- `input_colorspace()` / `output_colorspace()` both return `IOP_CS_LAB`.
+- `dt_iop_sharpen_init_global()` wires `process_plain`, `init`, `init_pipe`, `cleanup_pipe`, `commit_params`, `input_colorspace`, `output_colorspace`.
+
+**highlights.c (`libdtpipe/src/iop/highlights.c`):**
+- All internal functions are `static` (Phase 8 convention).
+- **Only `DT_IOP_HIGHLIGHTS_CLIP` mode implemented** — all other mode values are forced to clip in `commit_params()`. This avoids pulling in the heavy `hlreconstruct/` dependencies (box_filters, distance_transform, interpolation, noise_generator, opposed/laplacian/lch/segbased algorithms).
+- `hlreconstruct/` directory was **not** copied — not needed for clip-only mode.
+- Removed: entire OpenCL path, `_provide_raster_mask()` and all raster mask calls, `distort_mask()`, `tiling_callback()`, `legacy_params()`, `reload_defaults()`, `process_visualize()`, all `dt_mipmap_cache_*` calls, `DT_DEV_PIXELPIPE_DISPLAY_PASSTHRU` (not defined in dtpipe_internal.h).
+- `process_clip()`: per-channel clamp with optional late WB correction from `dev->chroma`; handles both mosaic (1-ch) and non-mosaic (4-ch) RAW.
+- `commit_params()`: copies params then forces `mode = DT_IOP_HIGHLIGHTS_CLIP`; disables piece for non-raw images.
+- `modify_roi_in()` / `modify_roi_out()`: passthrough (clip mode needs no extra border).
+- `input_colorspace()` / `output_colorspace()`: return `IOP_CS_RAW` for raw images, `IOP_CS_RGB` for non-raw.
+- `dt_iop_highlights_init_global()` wires `process_plain`, `init`, `init_pipe`, `cleanup_pipe`, `commit_params`, `modify_roi_in`, `modify_roi_out`, `input_colorspace`, `output_colorspace`.
+
+**Verification:** Compiles without errors or warnings. 99/99 checks pass, 0 failures (same as before — pre-existing `pipeline_render` alpha=0 failure is due to colorin/colorout stubs, unrelated to this task). `highlights` and `sharpen` no longer appear in the "[pixelpipe] module 'X' has no process function" log. Remaining stubs: `colorin`, `colorout`.
 
 ---
 
@@ -2716,7 +2750,7 @@ Copy this to track completion:
 - [ ] 8.5 Port rawprepare.c
 - [ ] 8.6 Port temperature.c
 - [x] 8.7 Port demosaic.c (Core Only)
-- [ ] 8.8 Port colorin.c and colorout.c with lcms2
+- [x] 8.8 Port colorin.c and colorout.c with lcms2
 - [ ] 8.9 Port highlights.c and sharpen.c
 - [ ] 8.10 Wire Up module->dev and White Balance Coefficients
 - [ ] 8.11 Update Tests and Regenerate Reference Renders

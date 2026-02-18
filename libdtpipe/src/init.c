@@ -134,6 +134,8 @@ extern void dt_iop_exposure_init_global(dt_iop_module_so_t *module);
 extern void dt_iop_rawprepare_init_global(dt_iop_module_so_t *module);
 extern void dt_iop_temperature_init_global(dt_iop_module_so_t *module);
 extern void dt_iop_demosaic_init_global(dt_iop_module_so_t *module);
+extern void dt_iop_sharpen_init_global(dt_iop_module_so_t *module);
+extern void dt_iop_highlights_init_global(dt_iop_module_so_t *module);
 /* --- end IOP forward declarations --------------------------------------- */
 
 typedef void (*iop_init_global_fn_t)(dt_iop_module_so_t *);
@@ -157,8 +159,8 @@ static const iop_registration_t _iop_registry[] = {
   { "exposure",    dt_iop_exposure_init_global },   /* Task 8.4: real process */
   { "colorout",    NULL },
   { "temperature", dt_iop_temperature_init_global }, /* Task 8.6: real process */
-  { "highlights",  NULL },
-  { "sharpen",     NULL },
+  { "highlights",  dt_iop_highlights_init_global }, /* Task 8.9: clip mode */
+  { "sharpen",     dt_iop_sharpen_init_global },     /* Task 8.9: USM */
 };
 
 static const int _iop_registry_len =

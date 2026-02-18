@@ -155,6 +155,8 @@ cp -r libdtpipe/build/share libdtpipe/build-release/
 - 8.5 Port rawprepare.c — ✅ Complete
 - 8.6 Port temperature.c — ✅ Complete
 - 8.7 Port demosaic.c (Core Only) — ✅ Complete
+- 8.8 Port colorin.c and colorout.c with lcms2 — 🔲 Not started (colorin/colorout are still NULL stubs)
+- 8.9 Port highlights.c and sharpen.c — ✅ Complete
 
 ---
 
@@ -395,6 +397,25 @@ Key implementation decisions:
 5. **`create.c` — `pipe->pipe.dsc` initialization**: `dtpipe_create()` initializes `pipe->pipe.dsc` from image metadata before building module list: `channels=1, TYPE_FLOAT, IOP_CS_RAW, filters, xtrans` for raw; `channels=4, TYPE_FLOAT, IOP_CS_RGB` for non-raw.
 
 Verified: 99/99 tests pass, 0 failures, 8.8s total. `demosaic` no longer in "no process function" log. Remaining stubs: `colorin`, `colorout`.
+
+### sharpen and highlights IOPs (`libdtpipe/src/iop/sharpen.c`, `highlights.c` — Task 8.9)
+
+**sharpen.c** — Unsharp mask on Lab L channel (after colorin).
+- All internal functions `static` (Phase 8 convention).
+- Removed: OpenCL, `init_presets()`, `init_global()`/`cleanup_global()` (OpenCL kernel management).
+- Kept: `process()` (Gaussian USM on L channel using per-thread row buffers), `commit_params()` (scales radius by 2.5 for sigma), `init()` (defaults: radius=2.0, amount=0.5, threshold=0.5).
+- `input_colorspace()` / `output_colorspace()` → `IOP_CS_LAB`.
+
+**highlights.c** — Highlight reconstruction in RAW colorspace (before demosaic).
+- All internal functions `static` (Phase 8 convention).
+- **Phase A: clip mode only** — `commit_params()` forces `mode = DT_IOP_HIGHLIGHTS_CLIP` regardless of params. Avoids pulling in `hlreconstruct/` dependencies (box_filters, distance_transform, interpolation, noise_generator, opposed/laplacian/lch/segbased).
+- `hlreconstruct/` directory **not** copied — not needed for clip mode.
+- Removed: OpenCL path, raster mask infrastructure (`_provide_raster_mask`, `dt_iop_piece_set_raster`, `dt_iop_piece_clear_raster`), `distort_mask()`, `tiling_callback()`, `legacy_params()`, `reload_defaults()`, `process_visualize()`, `DT_DEV_PIXELPIPE_DISPLAY_PASSTHRU` (not in libdtpipe).
+- `process_clip()`: per-channel clamp with optional late WB correction from `dev->chroma`; handles both mosaic (1-ch) and non-mosaic (4-ch) RAW.
+- `modify_roi_in()` / `modify_roi_out()`: passthrough (clip needs no extra border).
+- `input_colorspace()` / `output_colorspace()` → `IOP_CS_RAW` for raw, `IOP_CS_RGB` for non-raw.
+
+Verified: 99/99 checks, 0 failures. `highlights` and `sharpen` no longer in "no process function" log. Remaining stubs: `colorin`, `colorout`.
 
 ### Phase 8 IOP static-function convention
 All IOP internal functions MUST be `static`. In darktable each IOP compiles to its own `.so`; duplicate symbol names across IOPs are harmless. In libdtpipe all IOPs link into a single shared library, so non-static `process`, `init`, etc. collide at link time. Rule: every function in `libdtpipe/src/iop/*.c` that is not the public `dt_iop_<name>_init_global()` entry point must be declared `static`.

@@ -16,6 +16,9 @@ set(DTPIPE_SOURCES
   iop/rawprepare.c
   iop/temperature.c
   iop/demosaic.c
+  # Phase 8.9: sharpen and highlights
+  iop/sharpen.c
+  iop/highlights.c
 )
 
 add_library(dtpipe SHARED ${DTPIPE_SOURCES})
